@@ -26,15 +26,15 @@ export default function HomePage() {
   const [category, setCategory] = useState("all");
   const [loading, setLoading] = useState(true);
 
-  // Fetch products from Supabase
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
       let query = supabase.from("products").select("*");
-      
-      // Don't filter by user for homepage - show all products
+
       if (search.trim()) {
-        query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
+        query = query.or(
+          `title.ilike.%${search}%,description.ilike.%${search}%`
+        );
       }
       if (category !== "all") {
         query = query.eq("category", category);
@@ -43,7 +43,6 @@ export default function HomePage() {
       const { data, error } = await query.order("created_at", {
         ascending: false,
       });
-      
       if (error) throw error;
       setProducts(data || []);
     } catch (err) {
@@ -54,7 +53,6 @@ export default function HomePage() {
     }
   }, [search, category]);
 
-  // Fetch categories
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -62,9 +60,10 @@ export default function HomePage() {
           .from("products")
           .select("category")
           .not("category", "is", null);
-        
         if (!error && data) {
-          const uniqueCategories = Array.from(new Set(data.map(p => p.category)));
+          const uniqueCategories = Array.from(
+            new Set(data.map((p) => p.category))
+          );
           setCategories(["all", ...uniqueCategories]);
         }
       } catch (err) {
@@ -74,7 +73,6 @@ export default function HomePage() {
     fetchCategories();
   }, []);
 
-  // Real-time subscription for new products
   useEffect(() => {
     fetchProducts();
 
@@ -141,7 +139,7 @@ export default function HomePage() {
                   <Button variant="ghost">Connexion</Button>
                 </Link>
                 <Link href="/register">
-                  <Button>S'inscrire</Button>
+                  <Button>S&apos;inscrire</Button>
                 </Link>
               </>
             )}
@@ -228,10 +226,9 @@ export default function HomePage() {
         ) : products.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-muted-foreground text-lg mb-4">
-              {search || category !== "all" 
-                ? "Aucun produit trouvé correspondant à vos critères." 
-                : "Aucun produit disponible pour le moment."
-              }
+              {search || category !== "all"
+                ? "Aucun produit trouvé correspondant à vos critères."
+                : "Aucun produit disponible pour le moment."}
             </p>
             {profile?.role === "merchant" && !search && category === "all" && (
               <Link href={ROUTES.addProduct}>
@@ -245,7 +242,7 @@ export default function HomePage() {
               <ProductCard
                 key={product.id}
                 product={product}
-                onDelete={() => fetchProducts()}
+                onDelete={fetchProducts}
               />
             ))}
           </div>
@@ -296,7 +293,7 @@ export default function HomePage() {
           <div>
             <h3 className="text-xl font-bold mb-4">DakarMarket</h3>
             <p className="text-gray-400">
-              Votre plateforme d'e-commerce local à Dakar.
+              Votre plateforme d&apos;e-commerce local à Dakar.
             </p>
           </div>
           <div>
@@ -307,7 +304,7 @@ export default function HomePage() {
                   href="#"
                   className="text-gray-400 hover:text-white transition"
                 >
-                  Conditions d'utilisation
+                  Conditions d&apos;utilisation
                 </Link>
               </li>
               <li>
