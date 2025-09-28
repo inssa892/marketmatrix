@@ -51,29 +51,23 @@ export default function ProductCard({
   // Récupère toutes les images disponibles
   const getProductImages = () => {
     const images: string[] = [];
-
-    if (product.images && Array.isArray(product.images)) {
-      images.push(...product.images.filter((img) => img));
-    }
-
-    // image_url peut être un tableau ou une chaîne
+    if (product.images && Array.isArray(product.images))
+      images.push(...product.images.filter(Boolean));
     if (product.image_url) {
-      if (Array.isArray(product.image_url)) {
-        images.push(...product.image_url.filter((img) => img));
-      } else if (typeof product.image_url === "string") {
+      if (Array.isArray(product.image_url))
+        images.push(...product.image_url.filter(Boolean));
+      else if (typeof product.image_url === "string")
         images.push(product.image_url);
-      }
     }
-
     return images;
   };
-
   const productImages = getProductImages();
   const hasMultipleImages = productImages.length > 1;
 
+  // ⚡️ Load merchant profile and favorite status
   useEffect(() => {
     if (user && isClient) checkIfFavorite();
-    if (isClient && product.user_id) loadMerchantProfile();
+    if (product.user_id) loadMerchantProfile();
   }, [user, product.id, product.user_id]);
 
   const loadMerchantProfile = async () => {
@@ -153,7 +147,6 @@ export default function ProductCard({
             { client_id: user.id, product_id: product.id, quantity: 1 },
           ]);
       }
-
       toast.success("Added to cart");
     } catch {
       toast.error("Failed to add to cart");
@@ -170,12 +163,14 @@ export default function ProductCard({
     if (!phoneNumber)
       return toast.error("Merchant WhatsApp number not available");
 
-    const message = `Bonjour! Je suis intéressé(e) par ce produit:
+    const message = `Bonjour ${
+      merchantProfile.display_name || ""
+    }! Je suis intéressé(e) par ce produit:
 
 📦 *${product.title}*
-💰 Prix: ${product.price} CFA
+💰 Prix: ${product.price?.toLocaleString("fr-FR")} CFA
 📝 Description: ${product.description || "Aucune description"}
-🏷️ Catégorie: ${product.category}
+🏷️ Catégorie: ${product.category || "General"}
 
 Pouvez-vous me donner plus d'informations?`;
 
@@ -221,7 +216,6 @@ Pouvez-vous me donner plus d'informations?`;
               className="object-cover transition-transform group-hover:scale-105"
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             />
-
             {hasMultipleImages && (
               <>
                 <Button

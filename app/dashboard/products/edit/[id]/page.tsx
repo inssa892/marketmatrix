@@ -1,153 +1,161 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { supabase } from '@/lib/supabase'
-import { useAuth } from '@/hooks/useAuth'
-import { toast } from 'sonner'
-import { ArrowLeft, Upload, Loader as Loader2, X } from 'lucide-react'
-import Image from 'next/image'
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
+import { ArrowLeft, Upload, Loader as Loader2, X } from "lucide-react";
+import Image from "next/image";
 
 interface EditProductPageProps {
-  params: { id: string }
+  params: { id: string };
 }
 
 export default function EditProductPage({ params }: EditProductPageProps) {
-  const { user, profile } = useAuth()
-  const router = useRouter()
-  const [loading, setLoading] = useState(false)
-  const [imageUploading, setImageUploading] = useState(false)
-  const [productLoading, setProductLoading] = useState(true)
+  const { user, profile } = useAuth();
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [productLoading, setProductLoading] = useState(true);
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    price: '',
-    category: 'general',
-    images: [] as string[]
-  })
+    title: "",
+    description: "",
+    price: "",
+    category: "general",
+    images: [] as string[],
+  });
 
   // Redirect if not merchant
-  if (profile?.role !== 'merchant') {
-    router.push('/dashboard')
-    return null
-  }
-
   useEffect(() => {
-    loadProduct()
-  }, [params.id])
+    if (profile && profile.role !== "merchant") {
+      router.replace("/dashboard");
+    }
+  }, [profile, router]);
+
+  // Load product once user & profile ready
+  useEffect(() => {
+    if (!user || !profile) return;
+    loadProduct();
+  }, [user, profile, params.id]);
 
   const loadProduct = async () => {
+    setProductLoading(true);
     try {
       const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('id', params.id)
-        .eq('user_id', user?.id) // Ensure user owns the product
-        .single()
+        .from("products")
+        .select("*")
+        .eq("id", params.id)
+        .eq("user_id", user?.id)
+        .single();
 
-      if (error) throw error
+      if (error) throw error;
 
-      // Handle both images array and image_url
-      const productImages: string[] = []
-      
+      const productImages: string[] = [];
       if (data.images && Array.isArray(data.images)) {
-        productImages.push(...data.images.filter(img => img && img.trim() !== ''))
+        productImages.push(
+          ...data.images.filter((img: string) => img?.trim() !== "")
+        );
       }
-      
-      if (data.image_url && data.image_url.trim() !== '' && !productImages.includes(data.image_url)) {
-        productImages.push(data.image_url)
+      if (
+        data.image_url &&
+        typeof data.image_url === "string" &&
+        data.image_url.trim() !== "" &&
+        !productImages.includes(data.image_url)
+      ) {
+        productImages.push(data.image_url);
       }
 
       setFormData({
         title: data.title,
-        description: data.description || '',
-        price: data.price.toString(),
-        category: data.category,
-        images: productImages
-      })
+        description: data.description || "",
+        price: data.price?.toString() || "",
+        category: data.category || "general",
+        images: productImages,
+      });
     } catch (error: any) {
-      toast.error('Failed to load product')
-      router.push('/dashboard/products')
+      toast.error("Failed to load product");
+      router.replace("/dashboard/products");
     } finally {
-      setProductLoading(false)
+      setProductLoading(false);
     }
-  }
+  };
 
   const uploadImage = async (file: File) => {
-    setImageUploading(true)
+    setImageUploading(true);
     try {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${user?.id}-${Date.now()}-${Math.random()}.${fileExt}`
-      const filePath = `products/${fileName}`
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${user?.id}-${Date.now()}-${Math.random()}.${fileExt}`;
+      const filePath = `products/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('products')
-        .upload(filePath, file)
+        .from("products")
+        .upload(filePath, file);
 
-      if (uploadError) throw uploadError
+      if (uploadError) throw uploadError;
 
-      const { data } = supabase.storage
-        .from('products')
-        .getPublicUrl(filePath)
+      const { data } = supabase.storage.from("products").getPublicUrl(filePath);
 
-      setFormData(prev => ({ 
-        ...prev, 
-        images: [...prev.images, data.publicUrl] 
-      }))
-      toast.success('Image uploaded successfully!')
+      setFormData((prev) => ({
+        ...prev,
+        images: [...prev.images, data.publicUrl],
+      }));
+      toast.success("Image uploaded successfully!");
     } catch (error: any) {
-      toast.error('Failed to upload image: ' + error.message)
+      toast.error("Failed to upload image: " + error.message);
     } finally {
-      setImageUploading(false)
+      setImageUploading(false);
     }
-  }
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (files) {
-      Array.from(files).forEach(file => {
-        uploadImage(file)
-      })
-    }
-  }
+    const files = e.target.files;
+    if (files) Array.from(files).forEach((file) => uploadImage(file));
+  };
 
   const removeImage = (indexToRemove: number) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      images: prev.images.filter((_, index) => index !== indexToRemove)
-    }))
-  }
+      images: prev.images.filter((_, i) => i !== indexToRemove),
+    }));
+  };
 
   const moveImage = (fromIndex: number, toIndex: number) => {
-    setFormData(prev => {
-      const newImages = [...prev.images]
-      const [movedImage] = newImages.splice(fromIndex, 1)
-      newImages.splice(toIndex, 0, movedImage)
-      return { ...prev, images: newImages }
-    })
-  }
+    setFormData((prev) => {
+      const newImages = [...prev.images];
+      const [moved] = newImages.splice(fromIndex, 1);
+      newImages.splice(toIndex, 0, moved);
+      return { ...prev, images: newImages };
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!user) return
+    e.preventDefault();
+    if (!user) return;
 
     if (!formData.title.trim()) {
-      toast.error('Product title is required')
-      return
+      toast.error("Product title is required");
+      return;
     }
 
     if (!formData.price || parseFloat(formData.price) <= 0) {
-      toast.error('Valid price is required')
-      return
+      toast.error("Valid price is required");
+      return;
     }
 
-    setLoading(true)
+    setLoading(true);
     try {
       const updateData = {
         title: formData.title.trim(),
@@ -155,28 +163,29 @@ export default function EditProductPage({ params }: EditProductPageProps) {
         price: parseFloat(formData.price),
         category: formData.category,
         images: formData.images.length > 0 ? formData.images : null,
-        image_url: formData.images.length > 0 ? formData.images[0] : null, // Set first image as main
-        updated_at: new Date().toISOString()
-      }
+        // ✅ Toujours passer image_url comme tableau pour text[]
+        image_url: formData.images.length > 0 ? [formData.images[0]] : null,
+        updated_at: new Date().toISOString(),
+      };
 
       const { error } = await supabase
-        .from('products')
+        .from("products")
         .update(updateData)
-        .eq('id', params.id)
-        .eq('user_id', user.id)
+        .eq("id", params.id)
+        .eq("user_id", user.id);
 
-      if (error) throw error
+      if (error) throw error;
 
-      toast.success('Product updated successfully!')
-      router.push('/dashboard/products')
+      toast.success("Product updated successfully!");
+      router.push("/dashboard/products");
     } catch (error: any) {
-      toast.error('Failed to update product: ' + error.message)
+      toast.error("Failed to update product: " + error.message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  if (productLoading) {
+  if (!profile || productLoading) {
     return (
       <div className="flex justify-center items-center py-8">
         <div className="flex items-center space-x-2">
@@ -184,18 +193,14 @@ export default function EditProductPage({ params }: EditProductPageProps) {
           <span>Loading product...</span>
         </div>
       </div>
-    )
+    );
   }
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center space-x-4">
-        <Button 
-          variant="ghost" 
-          size="icon"
-          onClick={() => router.back()}
-        >
+        <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
@@ -214,8 +219,7 @@ export default function EditProductPage({ params }: EditProductPageProps) {
             {/* Image Upload */}
             <div className="space-y-2">
               <Label>Product Images</Label>
-              
-              {/* Image Grid */}
+
               {formData.images.length > 0 && (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
                   {formData.images.map((imageUrl, index) => (
@@ -242,7 +246,6 @@ export default function EditProductPage({ params }: EditProductPageProps) {
                           Main
                         </div>
                       )}
-                      {/* Move buttons */}
                       {index > 0 && (
                         <Button
                           type="button"
@@ -261,13 +264,19 @@ export default function EditProductPage({ params }: EditProductPageProps) {
 
               {/* Upload Button */}
               <div className="flex items-center justify-center w-full">
-                <label htmlFor="images-upload" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-muted-foreground/25 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                <label
+                  htmlFor="images-upload"
+                  className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-muted-foreground/25 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+                >
                   <div className="flex flex-col items-center justify-center pt-5 pb-6">
                     <Upload className="w-8 h-8 mb-2 text-muted-foreground" />
                     <p className="mb-2 text-sm text-muted-foreground">
-                      <span className="font-semibold">Click to upload</span> or drag and drop
+                      <span className="font-semibold">Click to upload</span> or
+                      drag and drop
                     </p>
-                    <p className="text-xs text-muted-foreground">PNG, JPG, GIF up to 10MB</p>
+                    <p className="text-xs text-muted-foreground">
+                      PNG, JPG, GIF up to 10MB
+                    </p>
                   </div>
                   <input
                     id="images-upload"
@@ -280,11 +289,13 @@ export default function EditProductPage({ params }: EditProductPageProps) {
                   />
                 </label>
               </div>
-              
+
               {imageUploading && (
                 <div className="flex items-center justify-center py-2">
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  <span className="text-sm text-muted-foreground">Uploading images...</span>
+                  <span className="text-sm text-muted-foreground">
+                    Uploading images...
+                  </span>
                 </div>
               )}
             </div>
@@ -295,7 +306,9 @@ export default function EditProductPage({ params }: EditProductPageProps) {
               <Input
                 id="title"
                 value={formData.title}
-                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, title: e.target.value }))
+                }
                 placeholder="Enter product title"
                 required
               />
@@ -307,7 +320,12 @@ export default function EditProductPage({ params }: EditProductPageProps) {
               <Textarea
                 id="description"
                 value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
                 placeholder="Describe your product..."
                 rows={4}
               />
@@ -322,7 +340,9 @@ export default function EditProductPage({ params }: EditProductPageProps) {
                 step="0.01"
                 min="0"
                 value={formData.price}
-                onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, price: e.target.value }))
+                }
                 placeholder="0.00"
                 required
               />
@@ -331,9 +351,11 @@ export default function EditProductPage({ params }: EditProductPageProps) {
             {/* Category */}
             <div className="space-y-2">
               <Label>Category</Label>
-              <Select 
-                value={formData.category} 
-                onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+              <Select
+                value={formData.category}
+                onValueChange={(value) =>
+                  setFormData((prev) => ({ ...prev, category: value }))
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -351,9 +373,14 @@ export default function EditProductPage({ params }: EditProductPageProps) {
 
             {/* Submit */}
             <div className="flex space-x-4">
-              <Button 
-                type="submit" 
-                disabled={loading || imageUploading || !formData.title || !formData.price}
+              <Button
+                type="submit"
+                disabled={
+                  loading ||
+                  imageUploading ||
+                  !formData.title ||
+                  !formData.price
+                }
               >
                 {loading ? (
                   <>
@@ -361,12 +388,12 @@ export default function EditProductPage({ params }: EditProductPageProps) {
                     Updating...
                   </>
                 ) : (
-                  'Update Product'
+                  "Update Product"
                 )}
               </Button>
-              <Button 
-                type="button" 
-                variant="outline" 
+              <Button
+                type="button"
+                variant="outline"
                 onClick={() => router.back()}
               >
                 Cancel
@@ -376,5 +403,5 @@ export default function EditProductPage({ params }: EditProductPageProps) {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
