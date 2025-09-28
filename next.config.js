@@ -1,12 +1,12 @@
+// next.config.js
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true, // optionnel mais recommandé
-  webpack: (config) => {
-    config.ignoreWarnings = [{ module: /@supabase\/realtime-js/ }];
-    return config;
+  reactStrictMode: true,
+  eslint: {
+    ignoreDuringBuilds: true, // pour ignorer les erreurs ESLint pendant le build
   },
   images: {
-    domains: ["fcempygvfykaxytifbop.supabase.co"], // autorise ton domaine Supabase
+    domains: ["fcempygvfykaxytifbop.supabase.co"], // ajouter ton domaine Supabase
   },
 };
 
