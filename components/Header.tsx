@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -30,20 +30,63 @@ import { useTheme } from "next-themes";
 import { AnimatePresence, motion } from "framer-motion";
 
 export default function Header() {
-  // Références et états
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const { user, profile, signOut } = useAuth();
+  const { theme, setTheme } = useTheme();
+
+  const [mounted, setMounted] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [cartCount, setCartCount] = useState(0);
   const [favoritesCount, setFavoritesCount] = useState(0);
   const [unreadMessages, setUnreadMessages] = useState(0);
-  const [mounted, setMounted] = useState(false);
 
-  const { user, profile, signOut } = useAuth();
-  const router = useRouter();
-  const { theme, setTheme } = useTheme();
+  // --- Load counts functions encapsulated with useCallback ---
+  const loadCartCount = useCallback(async () => {
+    if (!user || profile?.role !== "client") return;
+    const { count } = await supabase
+      .from("cart_items")
+      .select("*", { count: "exact", head: true })
+      .eq("client_id", user.id);
+    setCartCount(count || 0);
+  }, [user, profile]);
 
-  // Fermer sidebar au clic en dehors
+  const loadFavoritesCount = useCallback(async () => {
+    if (!user || profile?.role !== "client") return;
+    const { count } = await supabase
+      .from("favorites")
+      .select("*", { count: "exact", head: true })
+      .eq("client_id", user.id);
+    setFavoritesCount(count || 0);
+  }, [user, profile]);
+
+  const loadUnreadMessages = useCallback(async () => {
+    if (!user) return;
+    const { count } = await supabase
+      .from("messages")
+      .select("*", { count: "exact", head: true })
+      .eq("to_user", user.id)
+      .eq("read", false);
+    setUnreadMessages(count || 0);
+  }, [user]);
+
+  const loadCounts = useCallback(async () => {
+    if (!user) return;
+    await Promise.all([
+      loadCartCount(),
+      loadFavoritesCount(),
+      loadUnreadMessages(),
+    ]);
+  }, [user, loadCartCount, loadFavoritesCount, loadUnreadMessages]);
+
+  // --- Mounted ---
+  useEffect(() => {
+    setMounted(true);
+    if (user && profile) loadCounts();
+  }, [user, profile, loadCounts]);
+
+  // --- Handle clicks outside sidebar ---
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -58,51 +101,7 @@ export default function Header() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [mobileMenuOpen]);
 
-  // Charger les compteurs
-  useEffect(() => {
-    setMounted(true);
-    if (user && profile) {
-      loadCounts();
-    }
-  }, [user, profile]);
-
-  const loadCounts = async () => {
-    if (!user) return;
-    await Promise.all([
-      loadCartCount(),
-      loadFavoritesCount(),
-      loadUnreadMessages(),
-    ]);
-  };
-
-  const loadCartCount = async () => {
-    if (!user || profile?.role !== "client") return;
-    const { count } = await supabase
-      .from("cart_items")
-      .select("*", { count: "exact", head: true })
-      .eq("client_id", user.id);
-    setCartCount(count || 0);
-  };
-
-  const loadFavoritesCount = async () => {
-    if (!user || profile?.role !== "client") return;
-    const { count } = await supabase
-      .from("favorites")
-      .select("*", { count: "exact", head: true })
-      .eq("client_id", user.id);
-    setFavoritesCount(count || 0);
-  };
-
-  const loadUnreadMessages = async () => {
-    if (!user) return;
-    const { count } = await supabase
-      .from("messages")
-      .select("*", { count: "exact", head: true })
-      .eq("to_user", user.id)
-      .eq("read", false);
-    setUnreadMessages(count || 0);
-  };
-
+  // --- Handlers ---
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
@@ -230,7 +229,7 @@ export default function Header() {
                     <Link href="/dashboard/settings">Settings</Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleSignOut}>
-                    <LogOut className="mr-2 h-4 w-4 text-white" />
+                    <LogOut className="mr-2 h-4 w-4" />
                     Sign Out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -287,7 +286,6 @@ export default function Header() {
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
               className="relative ml-auto h-screen w-64 bg-black/70 backdrop-blur-md text-white p-6 flex flex-col shadow-xl"
             >
-              {/* Close Button */}
               <div className="flex justify-end">
                 <Button
                   variant="ghost"
@@ -298,7 +296,6 @@ export default function Header() {
                 </Button>
               </div>
 
-              {/* Sidebar Links */}
               <div className="flex flex-col space-y-2 mt-4 flex-1 overflow-y-auto">
                 <Link href="/dashboard">
                   <Button
@@ -358,7 +355,6 @@ export default function Header() {
                 </Link>
               </div>
 
-              {/* Profile Section */}
               {user && (
                 <div className="mt-auto">
                   <div className="flex flex-col mb-2">
