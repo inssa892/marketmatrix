@@ -1,98 +1,100 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { supabase } from '@/lib/supabase'
-import { useAuth } from '@/hooks/useAuth'
-import { toast } from 'sonner'
-import { ArrowLeft, Upload, Loader as Loader2, X } from 'lucide-react'
-import Image from 'next/image'
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
+import { ArrowLeft, Upload, Loader as Loader2, X } from "lucide-react";
+import Image from "next/image";
 
 export default function AddProductPage() {
-  const { user, profile } = useAuth()
-  const router = useRouter()
-  const [loading, setLoading] = useState(false)
-  const [imageUploading, setImageUploading] = useState(false)
+  const { user, profile } = useAuth();
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    price: '',
-    category: 'general',
-    images: [] as string[]
-  })
+    title: "",
+    description: "",
+    price: "",
+    category: "general",
+    images: [] as string[],
+  });
 
-  // Redirect if not merchant
-  if (profile?.role !== 'merchant') {
-    router.push('/dashboard')
-    return null
-  }
+  // ✅ Redirection si pas marchand
+  useEffect(() => {
+    if (profile && profile.role !== "merchant") {
+      router.replace("/dashboard");
+    }
+  }, [profile, router]);
 
   const uploadImage = async (file: File) => {
-    setImageUploading(true)
+    setImageUploading(true);
     try {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${user?.id}-${Date.now()}-${Math.random()}.${fileExt}`
-      const filePath = `products/${fileName}`
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${user?.id}-${Date.now()}-${Math.random()}.${fileExt}`;
+      const filePath = `products/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('products')
-        .upload(filePath, file)
+        .from("products")
+        .upload(filePath, file);
 
-      if (uploadError) throw uploadError
+      if (uploadError) throw uploadError;
 
-      const { data } = supabase.storage
-        .from('products')
-        .getPublicUrl(filePath)
+      const { data } = supabase.storage.from("products").getPublicUrl(filePath);
 
-      setFormData(prev => ({ 
-        ...prev, 
-        images: [...prev.images, data.publicUrl] 
-      }))
-      toast.success('Image uploaded successfully!')
+      if (data?.publicUrl) {
+        setFormData((prev) => ({
+          ...prev,
+          images: [...prev.images, data.publicUrl],
+        }));
+        toast.success("✅ Image uploaded");
+      }
     } catch (error: any) {
-      toast.error('Failed to upload image: ' + error.message)
+      toast.error("❌ Upload failed: " + error.message);
     } finally {
-      setImageUploading(false)
+      setImageUploading(false);
     }
-  }
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (files) {
-      Array.from(files).forEach(file => {
-        uploadImage(file)
-      })
-    }
-  }
+    if (!e.target.files) return;
+    Array.from(e.target.files).forEach(uploadImage);
+  };
 
   const removeImage = (indexToRemove: number) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      images: prev.images.filter((_, index) => index !== indexToRemove)
-    }))
-  }
+      images: prev.images.filter((_, index) => index !== indexToRemove),
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!user) return
+    e.preventDefault();
+    if (!user) return;
 
     if (!formData.title.trim()) {
-      toast.error('Product title is required')
-      return
+      toast.error("⚠️ Product title is required");
+      return;
     }
-
     if (!formData.price || parseFloat(formData.price) <= 0) {
-      toast.error('Valid price is required')
-      return
+      toast.error("⚠️ Valid price is required");
+      return;
     }
 
-    setLoading(true)
+    setLoading(true);
     try {
       const productData = {
         user_id: user.id,
@@ -101,38 +103,42 @@ export default function AddProductPage() {
         price: parseFloat(formData.price),
         category: formData.category,
         images: formData.images.length > 0 ? formData.images : null,
-        image_url: formData.images.length > 0 ? formData.images[0] : null // Set first image as main
-      }
+        image_url: formData.images.length > 0 ? [formData.images[0]] : null, // ✅ tableau respectant text[]
+      };
 
-      const { error } = await supabase
-        .from('products')
-        .insert([productData])
+      const { error } = await supabase.from("products").insert([productData]);
 
-      if (error) throw error
+      if (error) throw error;
 
-      toast.success('Product created successfully!')
-      router.push('/dashboard/products')
+      toast.success("🎉 Product created!");
+      router.push("/dashboard/products");
     } catch (error: any) {
-      toast.error('Failed to create product: ' + error.message)
+      toast.error("❌ Failed: " + error.message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
+  };
+
+  if (!profile) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-6 w-6 animate-spin" />
+      </div>
+    );
   }
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center space-x-4">
-        <Button 
-          variant="ghost" 
-          size="icon"
-          onClick={() => router.back()}
-        >
+        <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
           <h1 className="text-3xl font-bold">Add New Product</h1>
-          <p className="text-muted-foreground">Create a new product for your store</p>
+          <p className="text-muted-foreground">
+            Create a new product for your store
+          </p>
         </div>
       </div>
 
@@ -146,8 +152,7 @@ export default function AddProductPage() {
             {/* Image Upload */}
             <div className="space-y-2">
               <Label>Product Images</Label>
-              
-              {/* Image Grid */}
+
               {formData.images.length > 0 && (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
                   {formData.images.map((imageUrl, index) => (
@@ -179,15 +184,20 @@ export default function AddProductPage() {
                 </div>
               )}
 
-              {/* Upload Button */}
               <div className="flex items-center justify-center w-full">
-                <label htmlFor="images-upload" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-muted-foreground/25 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                <label
+                  htmlFor="images-upload"
+                  className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-muted-foreground/25 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+                >
                   <div className="flex flex-col items-center justify-center pt-5 pb-6">
                     <Upload className="w-8 h-8 mb-2 text-muted-foreground" />
                     <p className="mb-2 text-sm text-muted-foreground">
-                      <span className="font-semibold">Click to upload</span> or drag and drop
+                      <span className="font-semibold">Click to upload</span> or
+                      drag and drop
                     </p>
-                    <p className="text-xs text-muted-foreground">PNG, JPG, GIF up to 10MB</p>
+                    <p className="text-xs text-muted-foreground">
+                      PNG, JPG, GIF up to 10MB
+                    </p>
                   </div>
                   <input
                     id="images-upload"
@@ -200,11 +210,13 @@ export default function AddProductPage() {
                   />
                 </label>
               </div>
-              
+
               {imageUploading && (
                 <div className="flex items-center justify-center py-2">
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  <span className="text-sm text-muted-foreground">Uploading images...</span>
+                  <span className="text-sm text-muted-foreground">
+                    Uploading images...
+                  </span>
                 </div>
               )}
             </div>
@@ -215,7 +227,9 @@ export default function AddProductPage() {
               <Input
                 id="title"
                 value={formData.title}
-                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, title: e.target.value }))
+                }
                 placeholder="Enter product title"
                 required
               />
@@ -227,7 +241,12 @@ export default function AddProductPage() {
               <Textarea
                 id="description"
                 value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
                 placeholder="Describe your product..."
                 rows={4}
               />
@@ -242,7 +261,9 @@ export default function AddProductPage() {
                 step="0.01"
                 min="0"
                 value={formData.price}
-                onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, price: e.target.value }))
+                }
                 placeholder="0.00"
                 required
               />
@@ -251,12 +272,14 @@ export default function AddProductPage() {
             {/* Category */}
             <div className="space-y-2">
               <Label>Category</Label>
-              <Select 
-                value={formData.category} 
-                onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+              <Select
+                value={formData.category}
+                onValueChange={(value) =>
+                  setFormData((prev) => ({ ...prev, category: value }))
+                }
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="general">General</SelectItem>
@@ -271,9 +294,14 @@ export default function AddProductPage() {
 
             {/* Submit */}
             <div className="flex space-x-4">
-              <Button 
-                type="submit" 
-                disabled={loading || imageUploading || !formData.title || !formData.price}
+              <Button
+                type="submit"
+                disabled={
+                  loading ||
+                  imageUploading ||
+                  !formData.title ||
+                  !formData.price
+                }
               >
                 {loading ? (
                   <>
@@ -281,12 +309,12 @@ export default function AddProductPage() {
                     Creating...
                   </>
                 ) : (
-                  'Create Product'
+                  "Create Product"
                 )}
               </Button>
-              <Button 
-                type="button" 
-                variant="outline" 
+              <Button
+                type="button"
+                variant="outline"
                 onClick={() => router.back()}
               >
                 Cancel
@@ -296,5 +324,5 @@ export default function AddProductPage() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

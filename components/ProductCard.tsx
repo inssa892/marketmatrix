@@ -2,7 +2,16 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import { Heart, ShoppingCart, MoveVertical as MoreVertical, CreditCard as Edit, Trash2, ChevronLeft, ChevronRight, MessageCircle } from "lucide-react";
+import {
+  Heart,
+  ShoppingCart,
+  MoveVertical as MoreVertical,
+  CreditCard as Edit,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  MessageCircle,
+} from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,22 +48,23 @@ export default function ProductCard({
   const isClient = profile?.role === "client";
   const isMerchant = profile?.role === "merchant";
 
-  // Get all available images
+  // Récupère toutes les images disponibles
   const getProductImages = () => {
     const images: string[] = [];
-    
-    // Add images from images array if available
+
     if (product.images && Array.isArray(product.images)) {
-      images.push(...product.images.filter(img => img && img.trim() !== ''));
+      images.push(...product.images.filter((img) => img));
     }
-    
-    // Add image_url as fallback if no images array or as additional image
-    if (product.image_url && product.image_url.trim() !== '') {
-      if (!images.includes(product.image_url)) {
+
+    // image_url peut être un tableau ou une chaîne
+    if (product.image_url) {
+      if (Array.isArray(product.image_url)) {
+        images.push(...product.image_url.filter((img) => img));
+      } else if (typeof product.image_url === "string") {
         images.push(product.image_url);
       }
     }
-    
+
     return images;
   };
 
@@ -62,27 +72,20 @@ export default function ProductCard({
   const hasMultipleImages = productImages.length > 1;
 
   useEffect(() => {
-    if (user && isClient) {
-      checkIfFavorite();
-    }
-    if (isClient && product.user_id) {
-      loadMerchantProfile();
-    }
+    if (user && isClient) checkIfFavorite();
+    if (isClient && product.user_id) loadMerchantProfile();
   }, [user, product.id, product.user_id]);
 
   const loadMerchantProfile = async () => {
     try {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('whatsapp_number, phone, display_name, email')
-        .eq('id', product.user_id)
+        .from("profiles")
+        .select("whatsapp_number, phone, display_name, email")
+        .eq("id", product.user_id)
         .single();
-      
-      if (!error && data) {
-        setMerchantProfile(data);
-      }
-    } catch (error) {
-      console.error('Error loading merchant profile:', error);
+      if (!error && data) setMerchantProfile(data);
+    } catch (err) {
+      console.error("Error loading merchant profile:", err);
     }
   };
 
@@ -103,7 +106,6 @@ export default function ProductCard({
 
   const toggleFavorite = async () => {
     if (!user || !isClient) return;
-
     setIsLoading(true);
     try {
       if (isFavorite) {
@@ -130,7 +132,6 @@ export default function ProductCard({
 
   const addToCart = async () => {
     if (!user || !isClient) return;
-
     setIsLoading(true);
     try {
       const { data: existingItem } = await supabase
@@ -162,34 +163,34 @@ export default function ProductCard({
   };
 
   const sendWhatsAppMessage = () => {
-    if (!merchantProfile) {
-      toast.error("Merchant contact information not available");
-      return;
-    }
-
-    const phoneNumber = merchantProfile.whatsapp_number || merchantProfile.phone;
-    if (!phoneNumber) {
-      toast.error("Merchant WhatsApp number not available");
-      return;
-    }
+    if (!merchantProfile)
+      return toast.error("Merchant contact information not available");
+    const phoneNumber =
+      merchantProfile.whatsapp_number || merchantProfile.phone;
+    if (!phoneNumber)
+      return toast.error("Merchant WhatsApp number not available");
 
     const message = `Bonjour! Je suis intéressé(e) par ce produit:
 
 📦 *${product.title}*
-💰 Prix: ${product.price}€
-📝 Description: ${product.description || 'Aucune description'}
+💰 Prix: ${product.price} CFA
+📝 Description: ${product.description || "Aucune description"}
 🏷️ Catégorie: ${product.category}
 
 Pouvez-vous me donner plus d'informations?`;
 
-    const whatsappUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank');
+    window.open(
+      `https://wa.me/${phoneNumber.replace(
+        /[^0-9]/g,
+        ""
+      )}?text=${encodeURIComponent(message)}`,
+      "_blank"
+    );
     toast.success("Opening WhatsApp...");
   };
 
   const handleDelete = async () => {
     if (!isOwner) return;
-
     try {
       await supabase.from("products").delete().eq("id", product.id);
       toast.success("Product deleted successfully");
@@ -199,17 +200,14 @@ Pouvez-vous me donner plus d'informations?`;
     }
   };
 
-  const nextImage = () => {
-    setCurrentImageIndex((prev) => 
+  const nextImage = () =>
+    setCurrentImageIndex((prev) =>
       prev === productImages.length - 1 ? 0 : prev + 1
     );
-  };
-
-  const prevImage = () => {
-    setCurrentImageIndex((prev) => 
+  const prevImage = () =>
+    setCurrentImageIndex((prev) =>
       prev === 0 ? productImages.length - 1 : prev - 1
     );
-  };
 
   return (
     <Card className="group overflow-hidden transition-all hover:shadow-lg">
@@ -223,8 +221,7 @@ Pouvez-vous me donner plus d'informations?`;
               className="object-cover transition-transform group-hover:scale-105"
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             />
-            
-            {/* Image navigation for multiple images */}
+
             {hasMultipleImages && (
               <>
                 <Button
@@ -243,14 +240,12 @@ Pouvez-vous me donner plus d'informations?`;
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
-                
-                {/* Image indicators */}
                 <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex space-x-1">
-                  {productImages.map((_, index) => (
+                  {productImages.map((_, idx) => (
                     <div
-                      key={index}
+                      key={idx}
                       className={`w-2 h-2 rounded-full transition-colors ${
-                        index === currentImageIndex ? 'bg-white' : 'bg-white/50'
+                        idx === currentImageIndex ? "bg-white" : "bg-white/50"
                       }`}
                     />
                   ))}
@@ -264,7 +259,6 @@ Pouvez-vous me donner plus d'informations?`;
           </div>
         )}
 
-        {/* Action buttons overlay */}
         <div className="absolute top-2 right-2 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
           {isClient && (
             <Button
@@ -281,7 +275,6 @@ Pouvez-vous me donner plus d'informations?`;
               />
             </Button>
           )}
-
           {isOwner && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -291,15 +284,13 @@ Pouvez-vous me donner plus d'informations?`;
               </DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem onClick={onEdit}>
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit
+                  <Edit className="mr-2 h-4 w-4" /> Edit
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={handleDelete}
                   className="text-destructive"
                 >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
+                  <Trash2 className="mr-2 h-4 w-4" /> Delete
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -316,36 +307,34 @@ Pouvez-vous me donner plus d'informations?`;
         )}
         <div className="flex items-center justify-between mb-3">
           <span className="text-2xl font-bold text-primary">
-            ${product.price?.toFixed(2) || '0.00'}
+            {product.price?.toLocaleString("fr-FR")} CFA
           </span>
           <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
             {product.category}
           </span>
         </div>
-        
+
         {isClient && (
           <div className="flex space-x-2">
-            <Button 
-              onClick={addToCart} 
-              disabled={isLoading} 
+            <Button
+              onClick={addToCart}
+              disabled={isLoading}
               size="sm"
               className="flex-1"
             >
-              <ShoppingCart className="mr-2 h-4 w-4" />
-              Add to Cart
+              <ShoppingCart className="mr-2 h-4 w-4" /> Add to Cart
             </Button>
-            <Button 
+            <Button
               onClick={sendWhatsAppMessage}
               variant="outline"
               size="sm"
               className="flex-1"
             >
-              <MessageCircle className="mr-2 h-4 w-4" />
-              WhatsApp
+              <MessageCircle className="mr-2 h-4 w-4" /> WhatsApp
             </Button>
           </div>
         )}
-        
+
         {isMerchant && !isOwner && (
           <div className="text-center text-sm text-muted-foreground">
             Product by another merchant
