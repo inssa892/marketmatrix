@@ -1,264 +1,388 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { Search, ShoppingCart, Heart, User, Sun, Moon, LogOut, Bell } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  Search,
+  ShoppingCart,
+  Heart,
+  User,
+  Sun,
+  Moon,
+  LogOut,
+  Bell,
+  Menu,
+  X,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Badge } from '@/components/ui/badge'
-import { useAuth } from '@/hooks/useAuth'
-import { supabase } from '@/lib/supabase'
-import { useTheme } from 'next-themes'
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/lib/supabase";
+import { useTheme } from "next-themes";
+import { AnimatePresence, motion } from "framer-motion";
 
 export default function Header() {
-  const { user, profile, signOut } = useAuth()
-  const router = useRouter()
-  const { theme, setTheme } = useTheme()
-  const [searchQuery, setSearchQuery] = useState('')
-  const [cartCount, setCartCount] = useState(0)
-  const [favoritesCount, setFavoritesCount] = useState(0)
-  const [unreadMessages, setUnreadMessages] = useState(0)
-  const [mounted, setMounted] = useState(false)
+  // Références et états
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [cartCount, setCartCount] = useState(0);
+  const [favoritesCount, setFavoritesCount] = useState(0);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [mounted, setMounted] = useState(false);
 
+  const { user, profile, signOut } = useAuth();
+  const router = useRouter();
+  const { theme, setTheme } = useTheme();
+
+  // Fermer sidebar au clic en dehors
   useEffect(() => {
-    setMounted(true)
-    if (user && profile) {
-      loadCounts()
-      
-      // Set up real-time subscriptions
-      const cartSubscription = supabase
-        .channel(`cart:${user.id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'cart_items',
-            filter: `client_id=eq.${user.id}`
-          },
-          () => loadCartCount()
-        )
-        .subscribe()
-
-      const favoritesSubscription = supabase
-        .channel(`favorites:${user.id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'favorites',
-            filter: `client_id=eq.${user.id}`
-          },
-          () => loadFavoritesCount()
-        )
-        .subscribe()
-
-      const messagesSubscription = supabase
-        .channel(`messages:${user.id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'messages',
-            filter: `to_user=eq.${user.id}`
-          },
-          () => loadUnreadMessages()
-        )
-        .subscribe()
-
-      return () => {
-        supabase.removeChannel(cartSubscription)
-        supabase.removeChannel(favoritesSubscription)
-        supabase.removeChannel(messagesSubscription)
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        mobileMenuOpen &&
+        sidebarRef.current &&
+        !sidebarRef.current.contains(event.target as Node)
+      ) {
+        setMobileMenuOpen(false);
       }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [mobileMenuOpen]);
+
+  // Charger les compteurs
+  useEffect(() => {
+    setMounted(true);
+    if (user && profile) {
+      loadCounts();
     }
-  }, [user, profile])
+  }, [user, profile]);
 
   const loadCounts = async () => {
-    if (!user) return
+    if (!user) return;
     await Promise.all([
       loadCartCount(),
       loadFavoritesCount(),
-      loadUnreadMessages()
-    ])
-  }
+      loadUnreadMessages(),
+    ]);
+  };
 
   const loadCartCount = async () => {
-    if (!user || profile?.role !== 'client') return
-    
+    if (!user || profile?.role !== "client") return;
     const { count } = await supabase
-      .from('cart_items')
-      .select('*', { count: 'exact', head: true })
-      .eq('client_id', user.id)
-
-    setCartCount(count || 0)
-  }
+      .from("cart_items")
+      .select("*", { count: "exact", head: true })
+      .eq("client_id", user.id);
+    setCartCount(count || 0);
+  };
 
   const loadFavoritesCount = async () => {
-    if (!user || profile?.role !== 'client') return
-    
+    if (!user || profile?.role !== "client") return;
     const { count } = await supabase
-      .from('favorites')
-      .select('*', { count: 'exact', head: true })
-      .eq('client_id', user.id)
-
-    setFavoritesCount(count || 0)
-  }
+      .from("favorites")
+      .select("*", { count: "exact", head: true })
+      .eq("client_id", user.id);
+    setFavoritesCount(count || 0);
+  };
 
   const loadUnreadMessages = async () => {
-    if (!user) return
-    
+    if (!user) return;
     const { count } = await supabase
-      .from('messages')
-      .select('*', { count: 'exact', head: true })
-      .eq('to_user', user.id)
-      .eq('read', false)
-
-    setUnreadMessages(count || 0)
-  }
+      .from("messages")
+      .select("*", { count: "exact", head: true })
+      .eq("to_user", user.id)
+      .eq("read", false);
+    setUnreadMessages(count || 0);
+  };
 
   const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     if (searchQuery.trim()) {
-      router.push(`/dashboard/products?search=${encodeURIComponent(searchQuery)}`)
+      router.push(
+        `/dashboard/products?search=${encodeURIComponent(searchQuery)}`
+      );
+      setMobileMenuOpen(false);
     }
-  }
+  };
 
   const handleSignOut = async () => {
-    await signOut()
-    router.push('/login')
-  }
+    await signOut();
+    router.push("/login");
+  };
 
-  if (!mounted) return null
+  if (!mounted) return null;
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto px-4 py-4">
-        <div className="flex items-center justify-between">
-          {/* Logo */}
-          <Link href="/dashboard" className="flex items-center space-x-2">
-            <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-lg">D</span>
-            </div>
-            <span className="hidden md:block text-xl font-bold">DakarMarket</span>
-          </Link>
-
-          {/* Search */}
-          <form onSubmit={handleSearch} className="flex-1 max-w-md mx-8">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Search products..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </form>
-
-          {/* Actions */}
-          <div className="flex items-center space-x-4">
-            {/* Theme Toggle */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            >
-              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
-
-            {user && (
-              <>
-                {/* Messages */}
-                <Link href="/dashboard/messages">
-                  <Button variant="ghost" size="icon" className="relative">
-                    <Bell className="h-4 w-4" />
-                    {unreadMessages > 0 && (
-                      <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
-                        {unreadMessages > 9 ? '9+' : unreadMessages}
-                      </Badge>
-                    )}
-                  </Button>
-                </Link>
-
-                {/* Client-specific actions */}
-                {profile?.role === 'client' && (
-                  <>
-                    {/* Favorites */}
-                    <Link href="/dashboard/favorites">
-                      <Button variant="ghost" size="icon" className="relative">
-                        <Heart className="h-4 w-4" />
-                        {favoritesCount > 0 && (
-                          <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
-                            {favoritesCount > 9 ? '9+' : favoritesCount}
-                          </Badge>
-                        )}
-                      </Button>
-                    </Link>
-
-                    {/* Cart */}
-                    <Link href="/dashboard/cart">
-                      <Button variant="ghost" size="icon" className="relative">
-                        <ShoppingCart className="h-4 w-4" />
-                        {cartCount > 0 && (
-                          <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
-                            {cartCount > 9 ? '9+' : cartCount}
-                          </Badge>
-                        )}
-                      </Button>
-                    </Link>
-                  </>
-                )}
-
-                {/* User Menu */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                      <User className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{profile?.display_name || profile?.email}</span>
-                        <span className="text-xs text-muted-foreground capitalize">{profile?.role}</span>
-                      </div>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/dashboard/settings">Settings</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleSignOut}>
-                      <LogOut className="mr-2 h-4 w-4" />
-                      Sign Out
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </>
-            )}
-
-            {!user && (
-              <div className="flex items-center space-x-2">
-                <Link href="/login">
-                  <Button variant="ghost">Sign In</Button>
-                </Link>
-                <Link href="/register">
-                  <Button>Sign Up</Button>
-                </Link>
-              </div>
-            )}
+      <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+        {/* Logo */}
+        <Link href="/dashboard" className="flex items-center space-x-2">
+          <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center">
+            <span className="text-primary-foreground font-bold text-lg">D</span>
           </div>
+          <span className="hidden md:block text-xl font-bold">DakarMarket</span>
+        </Link>
+
+        {/* Desktop Search */}
+        <form
+          onSubmit={handleSearch}
+          className="hidden md:flex flex-1 max-w-md mx-8"
+        >
+          <div className="relative w-full">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search products..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </form>
+
+        {/* Desktop Actions */}
+        <div className="hidden md:flex items-center space-x-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          >
+            {theme === "dark" ? (
+              <Sun className="h-4 w-4" />
+            ) : (
+              <Moon className="h-4 w-4" />
+            )}
+          </Button>
+
+          {user && (
+            <>
+              <Link href="/dashboard/messages">
+                <Button variant="ghost" size="icon" className="relative">
+                  <Bell className="h-4 w-4" />
+                  {unreadMessages > 0 && (
+                    <Badge
+                      variant="destructive"
+                      className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center text-xs"
+                    >
+                      {unreadMessages > 9 ? "9+" : unreadMessages}
+                    </Badge>
+                  )}
+                </Button>
+              </Link>
+
+              {profile?.role === "client" && (
+                <>
+                  <Link href="/dashboard/favorites">
+                    <Button variant="ghost" size="icon" className="relative">
+                      <Heart className="h-4 w-4" />
+                      {favoritesCount > 0 && (
+                        <Badge
+                          variant="destructive"
+                          className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center text-xs"
+                        >
+                          {favoritesCount > 9 ? "9+" : favoritesCount}
+                        </Badge>
+                      )}
+                    </Button>
+                  </Link>
+                  <Link href="/dashboard/cart">
+                    <Button variant="ghost" size="icon" className="relative">
+                      <ShoppingCart className="h-4 w-4" />
+                      {cartCount > 0 && (
+                        <Badge
+                          variant="destructive"
+                          className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center text-xs"
+                        >
+                          {cartCount > 9 ? "9+" : cartCount}
+                        </Badge>
+                      )}
+                    </Button>
+                  </Link>
+                </>
+              )}
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <User className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem>
+                    <div className="flex flex-col">
+                      <span className="font-medium">
+                        {profile?.display_name || profile?.email}
+                      </span>
+                      <span className="text-xs text-muted-foreground capitalize">
+                        {profile?.role}
+                      </span>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard/settings">Settings</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleSignOut}>
+                    <LogOut className="mr-2 h-4 w-4 text-white" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          )}
+
+          {!user && (
+            <div className="flex items-center space-x-2">
+              <Link href="/login">
+                <Button variant="ghost">Sign In</Button>
+              </Link>
+              <Link href="/register">
+                <Button>Sign Up</Button>
+              </Link>
+            </div>
+          )}
+        </div>
+
+        {/* Mobile Menu Button */}
+        <div className="md:hidden">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          >
+            {mobileMenuOpen ? (
+              <X className="h-6 w-6" />
+            ) : (
+              <Menu className="h-6 w-6" />
+            )}
+          </Button>
         </div>
       </div>
+
+      {/* Mobile Sidebar */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex"
+          >
+            {/* Backdrop */}
+            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+
+            {/* Sidebar Panel */}
+            <motion.div
+              ref={sidebarRef}
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="relative ml-auto h-screen w-64 bg-black/70 backdrop-blur-md text-white p-6 flex flex-col shadow-xl"
+            >
+              {/* Close Button */}
+              <div className="flex justify-end">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <X className="h-6 w-6 text-white" />
+                </Button>
+              </div>
+
+              {/* Sidebar Links */}
+              <div className="flex flex-col space-y-2 mt-4 flex-1 overflow-y-auto">
+                <Link href="/dashboard">
+                  <Button
+                    variant="ghost"
+                    className="justify-start w-full text-white"
+                  >
+                    Dashboard
+                  </Button>
+                </Link>
+                <Link href="/dashboard/products">
+                  <Button
+                    variant="ghost"
+                    className="justify-start w-full text-white"
+                  >
+                    Products
+                  </Button>
+                </Link>
+                <Link href="/dashboard/favorites">
+                  <Button
+                    variant="ghost"
+                    className="justify-start w-full text-white"
+                  >
+                    Favorites
+                  </Button>
+                </Link>
+                <Link href="/dashboard/cart">
+                  <Button
+                    variant="ghost"
+                    className="justify-start w-full text-white"
+                  >
+                    Cart
+                  </Button>
+                </Link>
+                <Link href="/dashboard/orders">
+                  <Button
+                    variant="ghost"
+                    className="justify-start w-full text-white"
+                  >
+                    Orders
+                  </Button>
+                </Link>
+                <Link href="/dashboard/messages">
+                  <Button
+                    variant="ghost"
+                    className="justify-start w-full text-white"
+                  >
+                    Messages
+                  </Button>
+                </Link>
+                <Link href="/dashboard/settings">
+                  <Button
+                    variant="ghost"
+                    className="justify-start w-full text-white"
+                  >
+                    Settings
+                  </Button>
+                </Link>
+              </div>
+
+              {/* Profile Section */}
+              {user && (
+                <div className="mt-auto">
+                  <div className="flex flex-col mb-2">
+                    <span className="font-medium">
+                      {profile?.display_name || profile?.email}
+                    </span>
+                    <span className="text-xs text-muted-foreground capitalize">
+                      {profile?.role}
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    className="justify-start w-full text-white"
+                    onClick={handleSignOut}
+                  >
+                    <LogOut className="mr-2 h-4 w-4 text-white" />
+                    Sign Out
+                  </Button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </header>
-  )
+  );
 }

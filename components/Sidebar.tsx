@@ -42,7 +42,7 @@ export default function Sidebar() {
     profile?.role === "merchant" ? merchantNavigation : navigation;
 
   return (
-    <div className="flex h-full w-64 flex-col bg-card border-r">
+    <aside className="hidden md:flex md:flex-col w-64 bg-card border-r h-full">
       <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
         <nav className="mt-5 flex-1 px-2 space-y-1">
           {navItems.map((item) => {
@@ -66,6 +66,6 @@ export default function Sidebar() {
           })}
         </nav>
       </div>
-    </div>
+    </aside>
   );
 }
