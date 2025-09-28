@@ -1,36 +1,38 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAuth } from '@/hooks/useAuth';
-import { Loader as Loader2, Eye, EyeOff } from 'lucide-react';
-import TestAccountButtons from '@/components/TestAccountButtons';
+import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "@/hooks/useAuth";
+import { Loader as Loader2, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { signIn } = useAuth();
   const router = useRouter();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      setLoading(true);
 
-    const { data, error } = await signIn(email, password);
+      const { data, error } = await signIn(email, password);
 
-    if (data && !error) {
-      router.push('/dashboard');
-    }
+      if (data && !error) {
+        router.push("/dashboard");
+      }
 
-    setLoading(false);
-  };
+      setLoading(false);
+    },
+    [email, password, router, signIn]
+  );
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
@@ -62,7 +64,7 @@ export default function LoginPage() {
               <div className="relative">
                 <Input
                   id="password"
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? "text" : "password"}
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -92,14 +94,12 @@ export default function LoginPage() {
 
           <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">
-              Don't have an account?{' '}
+              Don&apos;t have an account?{" "}
               <Link href="/register" className="text-primary hover:underline">
                 Sign up here
               </Link>
             </p>
           </div>
-
-          <TestAccountButtons />
         </CardContent>
       </Card>
     </div>
