@@ -23,10 +23,10 @@ interface CartItemWithProduct {
   };
 }
 
-// Fonction sécurisée pour récupérer l'URL publique depuis Supabase Storage
+// ⚡ Fonction sécurisée pour récupérer l'URL publique
 function getPublicImageUrl(path?: string | null) {
   if (!path) return undefined;
-  const pathStr = String(path); // convertir en string au cas où
+  const pathStr = String(path);
   if (pathStr.startsWith("http")) return pathStr;
 
   const { data } = supabase.storage.from("products").getPublicUrl(pathStr);
@@ -48,12 +48,7 @@ export default function CartPage() {
     try {
       const { data, error } = await supabase
         .from("cart_items")
-        .select(
-          `
-          *,
-          product:products(id, title, price, image_url, user_id)
-        `
-        )
+        .select("*, product:products(id, title, price, image_url, user_id)")
         .eq("client_id", user.id);
 
       if (error) throw error;
@@ -72,7 +67,6 @@ export default function CartPage() {
         .from("cart_items")
         .update({ quantity: newQuantity })
         .eq("id", itemId);
-
       setCartItems((prev) =>
         prev.map((item) =>
           item.id === itemId ? { ...item, quantity: newQuantity } : item
@@ -98,7 +92,7 @@ export default function CartPage() {
     setCheckoutLoading(true);
 
     try {
-      // Regrouper les items par marchand
+      // Group items by merchant
       const merchantMap: Record<string, CartItemWithProduct[]> = {};
       cartItems.forEach((item) => {
         if (!merchantMap[item.product.user_id])
@@ -109,20 +103,21 @@ export default function CartPage() {
       for (const merchantId in merchantMap) {
         const items = merchantMap[merchantId];
         let message = `Bonjour! Nouvelle commande:\n\n`;
-
         let total = 0;
+
         items.forEach((it) => {
-          message += `📦 ${
-            it.product.title
-          }\n💰 ${it.product.price.toLocaleString("fr-FR")} CFA x ${
+          message += `📦 *${it.product.title}*\n`;
+          message += `💰 ${it.product.price.toLocaleString("fr-FR")} CFA x ${
             it.quantity
-          }\n\n`;
+          }\n`;
+          const imageUrl = getPublicImageUrl(it.product.image_url);
+          if (imageUrl) message += `🖼️ ${imageUrl}\n`;
+          message += `\n`;
           total += it.product.price * it.quantity;
         });
 
         message += `Total: ${total.toLocaleString("fr-FR")} CFA`;
 
-        // Récupérer le numéro WhatsApp du marchand
         const { data: merchantData } = await supabase
           .from("profiles")
           .select("whatsapp_number, phone")
@@ -131,8 +126,8 @@ export default function CartPage() {
 
         const phoneNumber =
           merchantData?.whatsapp_number || merchantData?.phone;
-
         if (phoneNumber) {
+          // Encode tout correctement pour WhatsApp
           window.open(
             `https://wa.me/${phoneNumber.replace(
               /[^0-9]/g,
@@ -143,13 +138,13 @@ export default function CartPage() {
         }
       }
 
-      // Enregistrer la commande dans Supabase
+      // Save orders
       const orders = cartItems.map((item) => ({
         client_id: user.id,
         product_id: item.product.id,
         merchant_id: item.product.user_id,
         quantity: item.quantity,
-        total: item.product.price * item.quantity,
+        total_price: item.product.price * item.quantity,
         status: "pending",
       }));
 
@@ -158,7 +153,7 @@ export default function CartPage() {
         .insert(orders);
       if (orderError) throw orderError;
 
-      // Vider le panier
+      // Clear cart
       const { error: clearError } = await supabase
         .from("cart_items")
         .delete()
@@ -181,7 +176,6 @@ export default function CartPage() {
 
   if (!profile)
     return <div className="text-center py-12">Loading profile...</div>;
-
   if (profile.role !== "client")
     return (
       <div className="text-center py-12">
@@ -190,10 +184,8 @@ export default function CartPage() {
         </p>
       </div>
     );
-
   if (loading)
     return <div className="flex justify-center py-8">Loading cart...</div>;
-
   if (cartItems.length === 0)
     return (
       <div className="text-center py-12">
@@ -222,72 +214,70 @@ export default function CartPage() {
         <div className="lg:col-span-2 space-y-4">
           {cartItems.map((item) => (
             <Card key={item.id}>
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-4">
-                  <div className="w-20 h-20 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                    {item.product.image_url ? (
-                      <Image
-                        src={getPublicImageUrl(item.product.image_url)!}
-                        alt={item.product.title}
-                        width={80}
-                        height={80}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <span className="text-muted-foreground text-xs">
-                          No Image
-                        </span>
-                      </div>
-                    )}
-                  </div>
+              <CardContent className="p-6 flex items-center space-x-4">
+                <div className="w-20 h-20 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                  {item.product.image_url ? (
+                    <Image
+                      src={getPublicImageUrl(item.product.image_url)!}
+                      alt={item.product.title}
+                      width={80}
+                      height={80}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <span className="text-muted-foreground text-xs">
+                        No Image
+                      </span>
+                    </div>
+                  )}
+                </div>
 
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold truncate">
-                      {item.product.title}
-                    </h3>
-                    <p className="text-lg font-bold text-primary">
-                      {item.product.price.toLocaleString("fr-FR")} CFA
-                    </p>
-                  </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold truncate">
+                    {item.product.title}
+                  </h3>
+                  <p className="text-lg font-bold text-primary">
+                    {item.product.price.toLocaleString("fr-FR")} CFA
+                  </p>
+                </div>
 
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                      disabled={item.quantity <= 1}
-                    >
-                      <Minus className="h-4 w-4" />
-                    </Button>
-                    <span className="w-12 text-center font-medium">
-                      {item.quantity}
-                    </span>
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                    disabled={item.quantity <= 1}
+                  >
+                    <Minus className="h-4 w-4" />
+                  </Button>
+                  <span className="w-12 text-center font-medium">
+                    {item.quantity}
+                  </span>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
 
-                  <div className="text-right">
-                    <p className="font-semibold">
-                      {(item.product.price * item.quantity).toLocaleString(
-                        "fr-FR"
-                      )}{" "}
-                      CFA
-                    </p>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => removeItem(item.id)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+                <div className="text-right">
+                  <p className="font-semibold">
+                    {(item.product.price * item.quantity).toLocaleString(
+                      "fr-FR"
+                    )}{" "}
+                    CFA
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => removeItem(item.id)}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -326,8 +316,7 @@ export default function CartPage() {
                   "Processing..."
                 ) : (
                   <>
-                    <CreditCard className="mr-2 h-4 w-4" />
-                    Checkout
+                    <CreditCard className="mr-2 h-4 w-4" /> Checkout
                   </>
                 )}
               </Button>
