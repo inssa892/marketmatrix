@@ -1,0 +1,127 @@
+🔹 Prompt Bolt.new – Terminer le projet
+
+Contexte :
+Projet Next.js 13 (App Router) + TypeScript + TailwindCSS + Supabase.
+Déjà commencé avec login, register, dashboard de base, comptes test client/merchant.
+Le projet doit être fonctionnel, SPA, moderne et inspiré de Vercel Store.
+
+1️⃣ Dashboard (/app/dashboard)
+
+layout.tsx : Sidebar + Header + ThemeProvider (dark/light mode).
+
+page.tsx : Statistiques rapides et actions (quick actions).
+
+Support SPA complet (pas de reload complet pour chaque action).
+
+2️⃣ Produits (/app/dashboard/products)
+
+page.tsx :
+
+Liste tous les produits (client/merchant).
+
+Support filtrage, pagination.
+
+Actions temps réel : ajouter au panier, ajouter aux favoris, éditer/supprimer pour merchant.
+
+Utilise ProductCard.
+
+add/page.tsx : Formulaire création produit (merchant) connecté à Supabase.
+
+edit/[id]/page.tsx : Formulaire édition produit (merchant) connecté à Supabase.
+
+3️⃣ Panier (/app/dashboard/cart/page.tsx)
+
+Liste les produits du panier du client.
+
+Utilise ProductCard ou mini-card spécifique panier.
+
+Calcul du total en temps réel.
+
+Bouton checkout → créer commande dans Supabase.
+
+4️⃣ Favoris (/app/dashboard/favorites/page.tsx)
+
+Liste les produits favoris du client.
+
+Actions : retirer du favori, ajouter au panier.
+
+5️⃣ Commandes (/app/dashboard/orders/page.tsx)
+
+Affiche historique commandes client.
+
+Pour merchant : affichage et gestion des commandes.
+
+Intégrer SPA : ouvrir commandes individuelles sans reload complet.
+
+Utiliser OrderList et composants associés.
+
+6️⃣ Messagerie (/app/dashboard/messages/page.tsx)
+
+Liste des threads (autres utilisateurs avec qui on a des messages).
+
+Cliquer → ouvrir MessageThread dynamiquement (SPA).
+
+Envoyer messages temps réel via Supabase Realtime.
+
+7️⃣ Paramètres / Profil (/app/dashboard/settings/page.tsx)
+
+Affiche AvatarUploader.
+
+Modifier info profil, mot de passe, thème (dark/light).
+
+Sauvegarde côté Supabase en temps réel.
+
+8️⃣ Composants manquants / à finaliser
+
+ProductCard.tsx → bouton panier + favoris + pour merchant : edit/delete.
+
+OrderList.tsx → liste commandes, actions selon rôle.
+
+MessageThread.tsx → fil messages + input temps réel.
+
+AvatarUploader.tsx → upload vers Supabase Storage.
+
+ThemeProvider.tsx → correction localStorage côté serveur.
+
+VoiceAssistant.tsx → bouton micro et placeholder fonction.
+
+9️⃣ Hooks / lib
+
+useAuth.ts → login/register + rôle + redirection SPA.
+
+supabaseClient.ts → connecter Supabase (URL + KEY).
+
+api.ts → fonctions utilitaires (cart, favorites, orders).
+
+🔟 Tests et comptes
+
+Créer comptes test :
+
+Client : client@test.com / testclient123
+
+Merchant : merchant@test.com / testmerchant123
+
+Boutons login test sur login/register.
+
+1️⃣1️⃣ Styles / UX
+
+TailwindCSS, dark/light mode, responsive.
+
+Notifications toast pour succès / erreurs.
+
+SPA partout : aucun reload complet après actions.
+
+⚡ Instructions finales
+
+Chaque page et composant doit être fonctionnel, complet et testable immédiatement.
+
+Respecter structure de fichier déjà définie.
+
+Utiliser React Hooks et Supabase en temps réel.
+
+Gestion des rôles et permissions.
+
+Corriger toutes erreurs localStorage, Realtime, import dynamique.
+
+Sortie attendue :
+Un projet Next.js + Supabase prêt à déployer, toutes pages et fonctionnalités complètes.
