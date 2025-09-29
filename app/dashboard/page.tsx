@@ -1,9 +1,7 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   ShoppingCart,
   Package,
@@ -12,117 +10,118 @@ import {
   Heart,
   MessageCircle,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { useOrders } from "@/hooks/useOrders";
+import { useMessages } from "@/hooks/useMessages";
+import { useRealtimeOrders } from "@/hooks/useRealtimeOrders";
+import { useRealtimeMessages } from "@/hooks/useRealtimeMessages";
 import { ROUTES } from "@/lib/routes";
-
-interface DashboardStats {
-  totalProducts?: number;
-  totalOrders: number;
-  totalCustomers?: number;
-  revenue?: number;
-  cartItems?: number;
-  favorites?: number;
-  unreadMessages: number;
-}
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 export default function DashboardPage() {
-  const { user, profile } = useAuth();
-  const [stats, setStats] = useState<DashboardStats>({
-    totalOrders: 0,
-    unreadMessages: 0,
-  });
-  const [loading, setLoading] = useState(true);
+  const { profile } = useAuth()
+  const { orderCounts } = useOrders()
+  const { threads } = useMessages()
+  const [stats, setStats] = useState({
+    totalProducts: 0,
+    cartItems: 0,
+    favorites: 0,
+    revenue: 0
+  })
+  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    if (user) {
-      loadStats();
+  // Temps réel
+  useRealtimeOrders({
+    onOrderUpdate: () => {
+      // Les stats seront mises à jour via useOrders
     }
-  }, [user, profile]);
+  })
 
-  const loadStats = async () => {
-    if (!user) return;
+  useRealtimeMessages({
+    onMessageUpdate: () => {
+      // Les messages seront mis à jour via useMessages
+    }
+  })
+
+  // Charger les stats spécifiques
+  useEffect(() => {
+    loadAdditionalStats()
+  }, [profile])
+
+  const loadAdditionalStats = async () => {
+    if (!profile) return
 
     try {
-      const statsData: DashboardStats = {
-        totalOrders: 0,
-        unreadMessages: 0,
-      };
-
-      if (profile?.role === "merchant") {
-        // Merchant stats
+      if (profile.role === 'merchant') {
+        // Stats marchand
         const { count: productsCount } = await supabase
-          .from("products")
-          .select("*", { count: "exact", head: true })
-          .eq("user_id", user.id);
-
-        const { count: ordersCount } = await supabase
-          .from("orders")
-          .select("*", { count: "exact", head: true })
-          .eq("merchant_id", user.id);
+          .from('products')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', profile.id)
 
         const { data: revenueData } = await supabase
-          .from("orders")
-          .select("total")
-          .eq("merchant_id", user.id)
-          .eq("status", "delivered");
+          .from('orders')
+          .select('total')
+          .eq('merchant_id', profile.id)
+          .eq('status', 'delivered')
 
-        const revenue =
-          revenueData?.reduce((sum, order) => sum + Number(order.total), 0) ||
-          0;
+        const revenue = revenueData?.reduce((sum, order) => sum + Number(order.total), 0) || 0
 
-        statsData.totalProducts = productsCount || 0;
-        statsData.totalOrders = ordersCount || 0;
-        statsData.revenue = revenue;
+        setStats(prev => ({
+          ...prev,
+          totalProducts: productsCount || 0,
+          revenue
+        }))
       } else {
-        // Client stats
-        const { count: ordersCount } = await supabase
-          .from("orders")
-          .select("*", { count: "exact", head: true })
-          .eq("client_id", user.id);
-
+        // Stats client
         const { count: cartCount } = await supabase
-          .from("cart_items")
-          .select("*", { count: "exact", head: true })
-          .eq("client_id", user.id);
+          .from('cart_items')
+          .select('*', { count: 'exact', head: true })
+          .eq('client_id', profile.id)
 
         const { count: favoritesCount } = await supabase
-          .from("favorites")
-          .select("*", { count: "exact", head: true })
-          .eq("client_id", user.id);
+          .from('favorites')
+          .select('*', { count: 'exact', head: true })
+          .eq('client_id', profile.id)
 
-        statsData.totalOrders = ordersCount || 0;
-        statsData.cartItems = cartCount || 0;
-        statsData.favorites = favoritesCount || 0;
+        setStats(prev => ({
+          ...prev,
+          cartItems: cartCount || 0,
+          favorites: favoritesCount || 0
+        }))
       }
-
-      // Unread messages for both roles
-      const { count: unreadCount } = await supabase
-        .from("messages")
-        .select("*", { count: "exact", head: true })
-        .eq("to_user", user.id)
-        .eq("read", false);
-
-      statsData.unreadMessages = unreadCount || 0;
-
-      setStats(statsData);
     } catch (error) {
-      console.error("Error loading stats:", error);
+      console.error('Erreur lors du chargement des statistiques:', error)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const getWelcomeMessage = () => {
-    const name =
-      profile?.display_name || profile?.email?.split("@")[0] || "User";
-    const role = profile?.role === "merchant" ? "Merchant" : "Customer";
+    const name = profile?.display_name || profile?.email?.split('@')[0] || 'Utilisateur'
+    const role = profile?.role === 'merchant' ? 'Marchand' : 'Client'
 
-    return `Welcome back, ${name}! Here's your ${role.toLowerCase()} dashboard overview.`;
-  };
+    return `Bienvenue ${name} ! Voici votre tableau de bord ${role.toLowerCase()}.`
+  }
+
+  const unreadMessages = threads.reduce((sum, thread) => sum + thread.unreadCount, 0)
 
   if (loading) {
-    return <div className="flex justify-center py-8">Loading dashboard...</div>;
+    return (
+      <div className="space-y-8">
+        <div className="text-center py-8">
+          <Skeleton className="h-8 w-64 mx-auto mb-2" />
+          <Skeleton className="h-6 w-96 mx-auto mb-2" />
+          <Skeleton className="h-6 w-32 mx-auto" />
+        </div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24" />
+          ))}
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -130,26 +129,26 @@ export default function DashboardPage() {
       {/* Welcome Section */}
       <div className="text-center py-8 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700 rounded-lg">
         <h1 className="text-3xl font-bold mb-2">
-          {profile?.role === "merchant"
-            ? "Merchant Dashboard"
-            : "Customer Dashboard"}
+          {profile?.role === 'merchant'
+            ? 'Tableau de bord Marchand'
+            : 'Tableau de bord Client'}
         </h1>
         <p className="text-muted-foreground text-lg">{getWelcomeMessage()}</p>
         <Badge variant="outline" className="mt-2">
-          {profile?.role === "merchant"
-            ? "Merchant Account"
-            : "Customer Account"}
+          {profile?.role === 'merchant'
+            ? 'Compte Marchand'
+            : 'Compte Client'}
         </Badge>
       </div>
 
       {/* Stats Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {profile?.role === "merchant" ? (
+        {profile?.role === 'merchant' ? (
           <>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Total Products
+                  Total Produits
                 </CardTitle>
                 <Package className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
@@ -161,23 +160,23 @@ export default function DashboardPage() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Total Orders
+                  Total Commandes
                 </CardTitle>
                 <ShoppingCart className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stats.totalOrders}</div>
+                <div className="text-2xl font-bold">{orderCounts.all}</div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Revenue</CardTitle>
+                <CardTitle className="text-sm font-medium">Revenus</CardTitle>
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  ${stats.revenue?.toFixed(2) || "0.00"}
+                  {stats.revenue.toFixed(2)} CFA
                 </div>
               </CardContent>
             </Card>
@@ -188,8 +187,8 @@ export default function DashboardPage() {
                 <MessageCircle className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stats.unreadMessages}</div>
-                <p className="text-xs text-muted-foreground">Unread messages</p>
+                <div className="text-2xl font-bold">{unreadMessages}</div>
+                <p className="text-xs text-muted-foreground">Messages non lus</p>
               </CardContent>
             </Card>
           </>
@@ -198,7 +197,7 @@ export default function DashboardPage() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Cart Items
+                  Articles Panier
                 </CardTitle>
                 <ShoppingCart className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
@@ -208,14 +207,14 @@ export default function DashboardPage() {
                   href={ROUTES.cart}
                   className="text-xs text-blue-600 hover:underline"
                 >
-                  View Cart
+                  Voir le panier
                 </Link>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Favorites</CardTitle>
+                <CardTitle className="text-sm font-medium">Favoris</CardTitle>
                 <Heart className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -224,23 +223,23 @@ export default function DashboardPage() {
                   href={ROUTES.favorites}
                   className="text-xs text-blue-600 hover:underline"
                 >
-                  View Favorites
+                  Voir les favoris
                 </Link>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Orders</CardTitle>
+                <CardTitle className="text-sm font-medium">Commandes</CardTitle>
                 <Package className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stats.totalOrders}</div>
+                <div className="text-2xl font-bold">{orderCounts.all}</div>
                 <Link
                   href={ROUTES.orders}
                   className="text-xs text-blue-600 hover:underline"
                 >
-                  Track Orders
+                  Suivre les commandes
                 </Link>
               </CardContent>
             </Card>
@@ -251,13 +250,13 @@ export default function DashboardPage() {
                 <MessageCircle className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stats.unreadMessages}</div>
-                <p className="text-xs text-muted-foreground">Unread messages</p>
+                <div className="text-2xl font-bold">{unreadMessages}</div>
+                <p className="text-xs text-muted-foreground">Messages non lus</p>
                 <Link
                   href={ROUTES.messages}
                   className="text-xs text-blue-600 hover:underline"
                 >
-                  Go to Messages
+                  Aller aux messages
                 </Link>
               </CardContent>
             </Card>
@@ -268,34 +267,34 @@ export default function DashboardPage() {
       {/* Quick Actions */}
       <Card>
         <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
+          <CardTitle>Actions rapides</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {profile?.role === "merchant" ? (
+            {profile?.role === 'merchant' ? (
               <>
                 <Link
                   href={ROUTES.products}
                   className="p-4 border rounded-lg hover:bg-muted/50 transition-colors block"
                 >
-                  <h3 className="font-semibold mb-2">Add New Product</h3>
+                  <h3 className="font-semibold mb-2">Ajouter un produit</h3>
                   <p className="text-sm text-muted-foreground">
-                    List a new product for sale
+                    Ajoutez un nouveau produit à vendre
                   </p>
                 </Link>
                 <Link
                   href={ROUTES.orders}
                   className="p-4 border rounded-lg hover:bg-muted/50 transition-colors block"
                 >
-                  <h3 className="font-semibold mb-2">Manage Orders</h3>
+                  <h3 className="font-semibold mb-2">Gérer les commandes</h3>
                   <p className="text-sm text-muted-foreground">
-                    Update order status and track deliveries
+                    Mettez à jour le statut et suivez les livraisons
                   </p>
                 </Link>
                 <div className="p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                  <h3 className="font-semibold mb-2">View Analytics</h3>
+                  <h3 className="font-semibold mb-2">Voir les analyses</h3>
                   <p className="text-sm text-muted-foreground">
-                    Track your sales performance
+                    Suivez vos performances de vente
                   </p>
                 </div>
               </>
@@ -305,27 +304,27 @@ export default function DashboardPage() {
                   href={ROUTES.products}
                   className="p-4 border rounded-lg hover:bg-muted/50 transition-colors block"
                 >
-                  <h3 className="font-semibold mb-2">Browse Products</h3>
+                  <h3 className="font-semibold mb-2">Parcourir les produits</h3>
                   <p className="text-sm text-muted-foreground">
-                    Discover new products to buy
+                    Découvrez de nouveaux produits à acheter
                   </p>
                 </Link>
                 <Link
                   href={ROUTES.cart}
                   className="p-4 border rounded-lg hover:bg-muted/50 transition-colors block"
                 >
-                  <h3 className="font-semibold mb-2">Check Cart</h3>
+                  <h3 className="font-semibold mb-2">Vérifier le panier</h3>
                   <p className="text-sm text-muted-foreground">
-                    Review items ready for purchase
+                    Vérifiez les articles prêts à acheter
                   </p>
                 </Link>
                 <Link
                   href={ROUTES.orders}
                   className="p-4 border rounded-lg hover:bg-muted/50 transition-colors block"
                 >
-                  <h3 className="font-semibold mb-2">Track Orders</h3>
+                  <h3 className="font-semibold mb-2">Suivre les commandes</h3>
                   <p className="text-sm text-muted-foreground">
-                    Monitor your order status
+                    Surveillez le statut de vos commandes
                   </p>
                 </Link>
               </>
@@ -334,5 +333,5 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }

@@ -1,9 +1,6 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
@@ -11,10 +8,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
-import { toast } from "sonner";
+import { useOrders } from '@/hooks/useOrders'
+import { useRealtimeOrders } from '@/hooks/useRealtimeOrders'
 import { format } from "date-fns";
+import { MessageCircle } from 'lucide-react'
+import { useState } from 'react'
+import MessageThread from './MessageThread'
 
 interface OrderListProps {
   statusFilter?:
@@ -25,96 +25,15 @@ interface OrderListProps {
     | "cancelled";
 }
 
-interface OrderWithDetails {
-  id: string;
-  quantity: number;
-  total: number;
-  status: "pending" | "confirmed" | "shipped" | "delivered" | "cancelled";
-  created_at: string;
-  product: {
-    title: string;
-    price: number;
-    image_url?: string;
-  };
-  client: {
-    display_name: string;
-    email: string;
-  };
-  merchant: {
-    display_name: string;
-    email: string;
-  };
-}
-
 export default function OrderList({ statusFilter }: OrderListProps) {
-  const { user, profile } = useAuth();
-  const [orders, setOrders] = useState<OrderWithDetails[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (user) {
-      loadOrders();
-    }
-  }, [user, profile, statusFilter]);
-
-  const loadOrders = async () => {
-    if (!user) return;
-    setLoading(true);
-
-    try {
-      let query = supabase.from("orders").select(`
-          *,
-          product:products(title, price, image_url),
-          client:profiles!orders_client_id_fkey(display_name, email),
-          merchant:profiles!orders_merchant_id_fkey(display_name, email)
-        `);
-
-      // Filter based on user role
-      query =
-        profile?.role === "merchant"
-          ? query.eq("merchant_id", user.id)
-          : query.eq("client_id", user.id);
-
-      // Apply status filter if provided
-      if (statusFilter) {
-        query = query.eq("status", statusFilter);
-      }
-
-      const { data, error } = await query.order("created_at", {
-        ascending: false,
-      });
-
-      if (error) throw error;
-      setOrders(data || []);
-    } catch (error) {
-      console.error(error);
-      toast.error("Failed to load orders");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const updateOrderStatus = async (orderId: string, newStatus: string) => {
-    try {
-      await supabase
-        .from("orders")
-        .update({
-          status: newStatus as any,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", orderId);
-
-      toast.success("Order status updated");
-      setOrders((prev) =>
-        prev.map((order) =>
-          order.id === orderId ? { ...order, status: newStatus as any } : order
-        )
-      );
-    } catch (error) {
-      console.error(error);
-      toast.error("Failed to update order status");
-    }
-  };
+  const { profile } = useAuth()
+  const { orders, loading, updateOrderStatus, refreshOrders } = useOrders(statusFilter)
+  const [selectedUser, setSelectedUser] = useState<any>(null)
+  
+  // Temps réel
+  useRealtimeOrders({
+    onOrderUpdate: refreshOrders
+  })
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -133,16 +52,44 @@ export default function OrderList({ statusFilter }: OrderListProps) {
     }
   };
 
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "pending": return "En attente"
+      case "confirmed": return "Confirmée"
+      case "shipped": return "Expédiée"
+      case "delivered": return "Livrée"
+      case "cancelled": return "Annulée"
+      default: return status
+    }
+  }
+
   if (loading) {
-    return <div className="flex justify-center py-8">Loading orders...</div>;
+    return <div className="flex justify-center py-8">Chargement des commandes...</div>
   }
 
   if (orders.length === 0) {
     return (
       <div className="text-center py-8">
-        <p className="text-muted-foreground">No orders found</p>
+        <p className="text-muted-foreground">Aucune commande trouvée</p>
       </div>
-    );
+    )
+  }
+
+  if (selectedUser) {
+    return (
+      <div className="space-y-4">
+        <Button 
+          variant="ghost" 
+          onClick={() => setSelectedUser(null)}
+        >
+          ← Retour aux commandes
+        </Button>
+        <MessageThread 
+          otherUser={selectedUser} 
+          onClose={() => setSelectedUser(null)}
+        />
+      </div>
+    )
   }
 
   return (
@@ -152,10 +99,10 @@ export default function OrderList({ statusFilter }: OrderListProps) {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg">
-                Order #{order.id.slice(0, 8)}
+                Commande #{order.id.slice(0, 8)}
               </CardTitle>
-              <Badge className={getStatusColor(order.status)}>
-                {order.status}
+              <Badge className={`${getStatusColor(order.status)} text-white`}>
+                {getStatusLabel(order.status)}
               </Badge>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -165,41 +112,59 @@ export default function OrderList({ statusFilter }: OrderListProps) {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <h4 className="font-medium mb-2">Product Details</h4>
+                <h4 className="font-medium mb-2">Détails du produit</h4>
                 <p className="text-sm">{order.product.title}</p>
                 <p className="text-sm text-muted-foreground">
-                  Quantity: {order.quantity} × ${order.product.price.toFixed(2)}
+                  Quantité: {order.quantity} × {order.product.price.toFixed(2)} CFA
                 </p>
                 <p className="font-semibold">
-                  Total: ${order.total.toFixed(2)}
+                  Total: {order.total.toFixed(2)} CFA
                 </p>
               </div>
 
               <div>
-                {profile?.role === "merchant" ? (
+                <div className="flex justify-between items-start">
+                  <div>
+                    {profile?.role === "merchant" ? (
+                      <>
+                        <h4 className="font-medium mb-2">Client</h4>
+                        <p className="text-sm">{order.client.display_name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {order.client.email}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <h4 className="font-medium mb-2">Marchand</h4>
+                        <p className="text-sm">{order.merchant.display_name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {order.merchant.email}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                  
+                  {/* Bouton de discussion */}
                   <>
-                    <h4 className="font-medium mb-2">Customer</h4>
-                    <p className="text-sm">{order.client.display_name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {order.client.email}
-                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setSelectedUser(
+                        profile?.role === "merchant" ? order.client : order.merchant
+                      )}
+                    >
+                      <MessageCircle className="mr-2 h-4 w-4" />
+                      Discuter
+                    </Button>
                   </>
-                ) : (
-                  <>
-                    <h4 className="font-medium mb-2">Merchant</h4>
-                    <p className="text-sm">{order.merchant.display_name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {order.merchant.email}
-                    </p>
-                  </>
-                )}
+                </div>
               </div>
             </div>
 
             {profile?.role === "merchant" &&
               !["delivered", "cancelled"].includes(order.status) && (
                 <div className="mt-4">
-                  <label className="text-sm font-medium">Update Status</label>
+                  <label className="text-sm font-medium">Mettre à jour le statut</label>
                   <Select
                     value={order.status}
                     onValueChange={(value) =>
@@ -210,11 +175,11 @@ export default function OrderList({ statusFilter }: OrderListProps) {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="confirmed">Confirmed</SelectItem>
-                      <SelectItem value="shipped">Shipped</SelectItem>
-                      <SelectItem value="delivered">Delivered</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                      <SelectItem value="pending">En attente</SelectItem>
+                      <SelectItem value="confirmed">Confirmée</SelectItem>
+                      <SelectItem value="shipped">Expédiée</SelectItem>
+                      <SelectItem value="delivered">Livrée</SelectItem>
+                      <SelectItem value="cancelled">Annulée</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -223,5 +188,5 @@ export default function OrderList({ statusFilter }: OrderListProps) {
         </Card>
       ))}
     </div>
-  );
+  )
 }

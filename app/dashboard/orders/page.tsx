@@ -1,73 +1,50 @@
-'use client'
-
-import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import OrderList from '@/components/OrderList'
-import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { useOrders } from '@/hooks/useOrders'
+import { useRealtimeOrders } from '@/hooks/useRealtimeOrders'
 import { Package, ShoppingBag } from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
 
 export default function OrdersPage() {
-  const { user, profile } = useAuth()
-  const [orderCounts, setOrderCounts] = useState({
-    all: 0,
-    pending: 0,
-    confirmed: 0,
-    shipped: 0,
-    delivered: 0
+  const { profile } = useAuth()
+  const { orderCounts, loading, refreshCounts } = useOrders()
+  
+  // Temps réel pour les mises à jour de commandes
+  useRealtimeOrders({
+    onOrderUpdate: refreshCounts
   })
 
-  useEffect(() => {
-    if (user) {
-      loadOrderCounts()
-    }
-  }, [user, profile])
-
-  const loadOrderCounts = async () => {
-    if (!user) return
-
-    try {
-      let query = supabase.from('orders').select('status', { count: 'exact' })
-
-      // Filter based on user role
-      if (profile?.role === 'merchant') {
-        query = query.eq('merchant_id', user.id)
-      } else {
-        query = query.eq('client_id', user.id)
-      }
-
-      const { data, error, count } = await query
-
-      if (error) throw error
-
-      const counts = {
-        all: count || 0,
-        pending: data?.filter(o => o.status === 'pending').length || 0,
-        confirmed: data?.filter(o => o.status === 'confirmed').length || 0,
-        shipped: data?.filter(o => o.status === 'shipped').length || 0,
-        delivered: data?.filter(o => o.status === 'delivered').length || 0
-      }
-
-      setOrderCounts(counts)
-    } catch (error: any) {
-      console.error('Failed to load order counts:', error)
-    }
-  }
-
   const getPageTitle = () => {
-    if (profile?.role === 'merchant') {
-      return 'Order Management'
-    }
-    return 'My Orders'
+    return profile?.role === 'merchant' 
+      ? 'Gestion des commandes' 
+      : 'Mes commandes'
   }
 
   const getPageDescription = () => {
-    if (profile?.role === 'merchant') {
-      return 'Manage and track all customer orders'
-    }
-    return 'Track your order history and status'
+    return profile?.role === 'merchant'
+      ? 'Gérez et suivez toutes les commandes clients'
+      : 'Suivez l&apos;historique et le statut de vos commandes'
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center space-x-4">
+          <Skeleton className="h-8 w-8" />
+          <div>
+            <Skeleton className="h-8 w-48 mb-2" />
+            <Skeleton className="h-4 w-64" />
+          </div>
+        </div>
+        <div className="grid gap-4 md:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-24" />
+          ))}
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -89,7 +66,7 @@ export default function OrdersPage() {
       <div className="grid gap-4 md:grid-cols-5">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
+            <CardTitle className="text-sm font-medium">Total commandes</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{orderCounts.all}</div>
@@ -98,7 +75,7 @@ export default function OrdersPage() {
         
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Pending</CardTitle>
+            <CardTitle className="text-sm font-medium">En attente</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-yellow-600">{orderCounts.pending}</div>
@@ -107,7 +84,7 @@ export default function OrdersPage() {
         
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Confirmed</CardTitle>
+            <CardTitle className="text-sm font-medium">Confirmées</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">{orderCounts.confirmed}</div>
@@ -116,7 +93,7 @@ export default function OrdersPage() {
         
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Shipped</CardTitle>
+            <CardTitle className="text-sm font-medium">Expédiées</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-purple-600">{orderCounts.shipped}</div>
@@ -125,7 +102,7 @@ export default function OrdersPage() {
         
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Delivered</CardTitle>
+            <CardTitle className="text-sm font-medium">Livrées</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{orderCounts.delivered}</div>
@@ -136,25 +113,25 @@ export default function OrdersPage() {
       {/* Orders List with Tabs */}
       <Card>
         <CardHeader>
-          <CardTitle>Orders</CardTitle>
+          <CardTitle>Commandes</CardTitle>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="all" className="w-full">
             <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="all">
-                All ({orderCounts.all})
+                Toutes ({orderCounts.all})
               </TabsTrigger>
               <TabsTrigger value="pending">
-                Pending ({orderCounts.pending})
+                En attente ({orderCounts.pending})
               </TabsTrigger>
               <TabsTrigger value="confirmed">
-                Confirmed ({orderCounts.confirmed})
+                Confirmées ({orderCounts.confirmed})
               </TabsTrigger>
               <TabsTrigger value="shipped">
-                Shipped ({orderCounts.shipped})
+                Expédiées ({orderCounts.shipped})
               </TabsTrigger>
               <TabsTrigger value="delivered">
-                Delivered ({orderCounts.delivered})
+                Livrées ({orderCounts.delivered})
               </TabsTrigger>
             </TabsList>
             

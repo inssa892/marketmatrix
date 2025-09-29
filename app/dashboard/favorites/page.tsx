@@ -1,14 +1,13 @@
-'use client'
-
-import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { supabase } from '@/lib/supabase'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/hooks/useAuth'
+import { favoritesApi, cartApi } from '@/lib/api'
 import { toast } from 'sonner'
 import { Heart, ShoppingCart, Trash2 } from 'lucide-react'
 import Image from 'next/image'
+import { useEffect, useState } from 'react'
 
 interface FavoriteWithProduct {
   id: string
@@ -31,7 +30,7 @@ export default function FavoritesPage() {
   if (profile?.role !== 'client') {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">Favorites are only available for clients.</p>
+        <p className="text-muted-foreground">Les favoris ne sont disponibles que pour les clients.</p>
       </div>
     )
   }
@@ -46,18 +45,10 @@ export default function FavoritesPage() {
     if (!user) return
 
     try {
-      const { data, error } = await supabase
-        .from('favorites')
-        .select(`
-          *,
-          product:products(id, title, description, price, image_url, user_id)
-        `)
-        .eq('client_id', user.id)
-
-      if (error) throw error
-      setFavorites(data || [])
+      const data = await favoritesApi.getItems(user.id)
+      setFavorites(data)
     } catch (error: any) {
-      toast.error('Failed to load favorites')
+      toast.error('Échec du chargement des favoris')
     } finally {
       setLoading(false)
     }
@@ -65,15 +56,15 @@ export default function FavoritesPage() {
 
   const removeFavorite = async (favoriteId: string) => {
     try {
-      await supabase
-        .from('favorites')
-        .delete()
-        .eq('id', favoriteId)
+      const favorite = favorites.find(f => f.id === favoriteId)
+      if (favorite) {
+        await favoritesApi.removeItem(user!.id, favorite.product.id)
+      }
 
       setFavorites(prev => prev.filter(fav => fav.id !== favoriteId))
-      toast.success('Removed from favorites')
+      toast.success('Retiré des favoris')
     } catch (error: any) {
-      toast.error('Failed to remove from favorites')
+      toast.error('Échec de la suppression des favoris')
     }
   }
 
@@ -81,48 +72,39 @@ export default function FavoritesPage() {
     if (!user) return
 
     try {
-      const { data: existingItem } = await supabase
-        .from('cart_items')
-        .select('*')
-        .eq('client_id', user.id)
-        .eq('product_id', productId)
-        .single()
-
-      if (existingItem) {
-        await supabase
-          .from('cart_items')
-          .update({ quantity: existingItem.quantity + 1 })
-          .eq('id', existingItem.id)
-      } else {
-        await supabase
-          .from('cart_items')
-          .insert([{ 
-            client_id: user.id, 
-            product_id: productId,
-            quantity: 1
-          }])
-      }
-
-      toast.success('Added to cart')
+      await cartApi.addItem(user.id, productId, 1)
+      toast.success('Ajouté au panier')
     } catch (error: any) {
-      toast.error('Failed to add to cart')
+      toast.error('Échec de l&apos;ajout au panier')
     }
   }
 
   if (loading) {
-    return <div className="flex justify-center py-8">Loading favorites...</div>
+    return (
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-8 w-32 mb-2" />
+          <Skeleton className="h-4 w-48" />
+        </div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="aspect-square" />
+          ))}
+        </div>
+      </div>
+    )
   }
 
   if (favorites.length === 0) {
     return (
       <div className="text-center py-12">
         <Heart className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-        <h2 className="text-2xl font-semibold mb-2">No favorites yet</h2>
+        <h2 className="text-2xl font-semibold mb-2">Aucun favori pour le moment</h2>
         <p className="text-muted-foreground mb-6">
-          Start browsing products and add them to your favorites
+          Commencez à parcourir les produits et ajoutez-les à vos favoris
         </p>
         <Button onClick={() => window.location.href = '/dashboard/products'}>
-          Browse Products
+          Parcourir les produits
         </Button>
       </div>
     )
@@ -132,9 +114,9 @@ export default function FavoritesPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold">My Favorites</h1>
+        <h1 className="text-3xl font-bold">Mes favoris</h1>
         <p className="text-muted-foreground">
-          {favorites.length} favorite product{favorites.length !== 1 ? 's' : ''}
+          {favorites.length} produit{favorites.length !== 1 ? 's' : ''} favori{favorites.length !== 1 ? 's' : ''}
         </p>
       </div>
 
@@ -152,7 +134,7 @@ export default function FavoritesPage() {
                 />
               ) : (
                 <div className="w-full h-full bg-muted flex items-center justify-center">
-                  <span className="text-muted-foreground">No Image</span>
+                  <span className="text-muted-foreground">Pas d&apos;image</span>
                 </div>
               )}
               
@@ -180,14 +162,14 @@ export default function FavoritesPage() {
               )}
               <div className="flex items-center justify-between">
                 <span className="text-2xl font-bold text-primary">
-                  ${favorite.product.price.toFixed(2)}
+                  {favorite.product.price.toFixed(2)} CFA
                 </span>
                 <Button 
                   onClick={() => addToCart(favorite.product.id)} 
                   size="sm"
                 >
                   <ShoppingCart className="mr-2 h-4 w-4" />
-                  Add to Cart
+                  Ajouter au panier
                 </Button>
               </div>
             </CardContent>
@@ -198,7 +180,7 @@ export default function FavoritesPage() {
       {/* Stats */}
       <div className="flex items-center justify-center pt-6">
         <Badge variant="outline">
-          {favorites.length} favorite{favorites.length !== 1 ? 's' : ''}
+          {favorites.length} favori{favorites.length !== 1 ? 's' : ''}
         </Badge>
       </div>
     </div>

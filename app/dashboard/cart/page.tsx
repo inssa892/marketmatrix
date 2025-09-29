@@ -1,15 +1,14 @@
-'use client'
-
-import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { supabase } from '@/lib/supabase'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/hooks/useAuth'
+import { cartApi } from '@/lib/api'
 import { toast } from 'sonner'
 import { Minus, Plus, Trash2, ShoppingBag, CreditCard } from 'lucide-react'
 import Image from 'next/image'
+import { useEffect, useState } from 'react'
 
 interface CartItemWithProduct {
   id: string
@@ -33,7 +32,7 @@ export default function CartPage() {
   if (profile?.role !== 'client') {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">Cart is only available for clients.</p>
+        <p className="text-muted-foreground">Le panier n&apos;est disponible que pour les clients.</p>
       </div>
     )
   }
@@ -48,18 +47,10 @@ export default function CartPage() {
     if (!user) return
 
     try {
-      const { data, error } = await supabase
-        .from('cart_items')
-        .select(`
-          *,
-          product:products(id, title, price, image_url, user_id)
-        `)
-        .eq('client_id', user.id)
-
-      if (error) throw error
-      setCartItems(data || [])
+      const data = await cartApi.getItems(user.id)
+      setCartItems(data)
     } catch (error: any) {
-      toast.error('Failed to load cart items')
+      toast.error('Échec du chargement du panier')
     } finally {
       setLoading(false)
     }
@@ -69,10 +60,7 @@ export default function CartPage() {
     if (newQuantity < 1) return
 
     try {
-      await supabase
-        .from('cart_items')
-        .update({ quantity: newQuantity })
-        .eq('id', itemId)
+      await cartApi.updateQuantity(itemId, newQuantity)
 
       setCartItems(prev => 
         prev.map(item => 
@@ -80,21 +68,18 @@ export default function CartPage() {
         )
       )
     } catch (error: any) {
-      toast.error('Failed to update quantity')
+      toast.error('Échec de la mise à jour de la quantité')
     }
   }
 
   const removeItem = async (itemId: string) => {
     try {
-      await supabase
-        .from('cart_items')
-        .delete()
-        .eq('id', itemId)
+      await cartApi.removeItem(itemId)
 
       setCartItems(prev => prev.filter(item => item.id !== itemId))
-      toast.success('Item removed from cart')
+      toast.success('Article retiré du panier')
     } catch (error: any) {
-      toast.error('Failed to remove item')
+      toast.error('Échec de la suppression de l&apos;article')
     }
   }
 
@@ -113,24 +98,15 @@ export default function CartPage() {
         status: 'pending' as const
       }))
 
-      const { error: orderError } = await supabase
-        .from('orders')
-        .insert(orders)
-
-      if (orderError) throw orderError
+      await Promise.all(orders.map(order => cartApi.addItem(order.client_id, order.product_id, order.quantity)))
 
       // Clear cart
-      const { error: clearError } = await supabase
-        .from('cart_items')
-        .delete()
-        .eq('client_id', user.id)
-
-      if (clearError) throw clearError
+      await cartApi.clearCart(user.id)
 
       setCartItems([])
-      toast.success('Order placed successfully!')
+      toast.success('Commande passée avec succès !')
     } catch (error: any) {
-      toast.error('Failed to place order: ' + error.message)
+      toast.error('Échec de la commande: ' + error.message)
     } finally {
       setCheckoutLoading(false)
     }
@@ -141,19 +117,34 @@ export default function CartPage() {
   )
 
   if (loading) {
-    return <div className="flex justify-center py-8">Loading cart...</div>
+    return (
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-8 w-48 mb-2" />
+          <Skeleton className="h-4 w-32" />
+        </div>
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-2 space-y-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-32" />
+            ))}
+          </div>
+          <Skeleton className="h-64" />
+        </div>
+      </div>
+    )
   }
 
   if (cartItems.length === 0) {
     return (
       <div className="text-center py-12">
         <ShoppingBag className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-        <h2 className="text-2xl font-semibold mb-2">Your cart is empty</h2>
+        <h2 className="text-2xl font-semibold mb-2">Votre panier est vide</h2>
         <p className="text-muted-foreground mb-6">
-          Start shopping to add items to your cart
+          Commencez vos achats pour ajouter des articles à votre panier
         </p>
         <Button onClick={() => window.location.href = '/dashboard/products'}>
-          Browse Products
+          Parcourir les produits
         </Button>
       </div>
     )
@@ -163,9 +154,9 @@ export default function CartPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold">Shopping Cart</h1>
+        <h1 className="text-3xl font-bold">Panier d&apos;achat</h1>
         <p className="text-muted-foreground">
-          {cartItems.length} item{cartItems.length !== 1 ? 's' : ''} in your cart
+          {cartItems.length} article{cartItems.length !== 1 ? 's' : ''} dans votre panier
         </p>
       </div>
 
@@ -188,7 +179,7 @@ export default function CartPage() {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <span className="text-muted-foreground text-xs">No Image</span>
+                        <span className="text-muted-foreground text-xs">Pas d&apos;image</span>
                       </div>
                     )}
                   </div>
@@ -197,7 +188,7 @@ export default function CartPage() {
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold truncate">{item.product.title}</h3>
                     <p className="text-lg font-bold text-primary">
-                      ${item.product.price.toFixed(2)}
+                      {item.product.price.toFixed(2)} CFA
                     </p>
                   </div>
 
@@ -224,7 +215,7 @@ export default function CartPage() {
                   {/* Total & Remove */}
                   <div className="text-right">
                     <p className="font-semibold">
-                      ${(item.product.price * item.quantity).toFixed(2)}
+                      {(item.product.price * item.quantity).toFixed(2)} CFA
                     </p>
                     <Button
                       size="sm"
@@ -245,22 +236,22 @@ export default function CartPage() {
         <div className="lg:col-span-1">
           <Card className="sticky top-6">
             <CardHeader>
-              <CardTitle>Order Summary</CardTitle>
+              <CardTitle>Résumé de la commande</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span>Subtotal</span>
-                  <span>${totalAmount.toFixed(2)}</span>
+                  <span>Sous-total</span>
+                  <span>{totalAmount.toFixed(2)} CFA</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Shipping</span>
-                  <span>Free</span>
+                  <span>Livraison</span>
+                  <span>Gratuite</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between font-semibold text-lg">
                   <span>Total</span>
-                  <span>${totalAmount.toFixed(2)}</span>
+                  <span>{totalAmount.toFixed(2)} CFA</span>
                 </div>
               </div>
 
@@ -271,18 +262,18 @@ export default function CartPage() {
                 disabled={checkoutLoading}
               >
                 {checkoutLoading ? (
-                  'Processing...'
+                  'Traitement...'
                 ) : (
                   <>
                     <CreditCard className="mr-2 h-4 w-4" />
-                    Checkout
+                    Commander
                   </>
                 )}
               </Button>
 
               <div className="text-center">
                 <Badge variant="outline" className="text-xs">
-                  Secure checkout powered by Supabase
+                  Paiement sécurisé par Supabase
                 </Badge>
               </div>
             </CardContent>
