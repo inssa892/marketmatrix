@@ -1,127 +1,100 @@
-🔹 Prompt Bolt.new – Terminer le projet
-
 Contexte :
-Projet Next.js 13 (App Router) + TypeScript + TailwindCSS + Supabase.
-Déjà commencé avec login, register, dashboard de base, comptes test client/merchant.
-Le projet doit être fonctionnel, SPA, moderne et inspiré de Vercel Store.
+Nous avons commencé un projet e-commerce avec Next.js 13 (App Router) + TypeScript + TailwindCSS + Supabase. Le projet fonctionne partiellement : les pages Products et dashboard marchand existent, mais certaines fonctionnalités manquent ou ne sont pas totalement intégrées.
 
-1️⃣ Dashboard (/app/dashboard)
+Vous devez prendre le code existant que je fournis, continuer dans sa logique, analyser toutes les pages, et compléter les fonctionnalités restantes.
 
-layout.tsx : Sidebar + Header + ThemeProvider (dark/light mode).
+Objectifs :
 
-page.tsx : Statistiques rapides et actions (quick actions).
+Produits / Recherche / Filtres / Tri
 
-Support SPA complet (pas de reload complet pour chaque action).
+La recherche doit être live, lettre par lettre, sur titre et description.
 
-2️⃣ Produits (/app/dashboard/products)
+Doit fonctionner aussi bien depuis la page Products, le header, et le sidebar mobile.
 
-page.tsx :
+Filtre par catégorie et tri dynamique (par date, prix, nom).
 
-Liste tous les produits (client/merchant).
+Mise à jour en temps réel via Supabase.
 
-Support filtrage, pagination.
+Les résultats doivent afficher le prix en FCFA.
 
-Actions temps réel : ajouter au panier, ajouter aux favoris, éditer/supprimer pour merchant.
+Si aucune correspondance, afficher un message clair en français.
 
-Utilise ProductCard.
+Dashboard Marchand
 
-add/page.tsx : Formulaire création produit (merchant) connecté à Supabase.
+Pages existantes : principal, ajouter produit, modifier produit.
 
-edit/[id]/page.tsx : Formulaire édition produit (merchant) connecté à Supabase.
+Compléter toutes les fonctionnalités manquantes : modification, suppression, affichage en temps réel.
 
-3️⃣ Panier (/app/dashboard/cart/page.tsx)
+Ajouter un badge compteur dynamique pour le nombre de produits.
 
-Liste les produits du panier du client.
+Tout texte non traduit en français doit l’être.
 
-Utilise ProductCard ou mini-card spécifique panier.
+Header et Sidebar
 
-Calcul du total en temps réel.
+Les recherches et filtres sur header/sidebar doivent interagir avec ProductsPage.
 
-Bouton checkout → créer commande dans Supabase.
+Si l’utilisateur appuie sur Entrée dans le header ou sidebar, la page Products doit se mettre à jour automatiquement avec la query.
 
-4️⃣ Favoris (/app/dashboard/favorites/page.tsx)
+Les filtres et recherches doivent être synchronisés sur toutes les pages.
 
-Liste les produits favoris du client.
+Produits Grid
 
-Actions : retirer du favori, ajouter au panier.
+Carte produit réutilisable (ProductCard) déjà existante.
 
-5️⃣ Commandes (/app/dashboard/orders/page.tsx)
+Boutons Ajouter au panier, Contacter le marchand.
 
-Affiche historique commandes client.
+Nombre de résultats dynamique.
 
-Pour merchant : affichage et gestion des commandes.
+Affichage responsive (mobile/tablette/desktop).
 
-Intégrer SPA : ouvrir commandes individuelles sans reload complet.
+Supabase
 
-Utiliser OrderList et composants associés.
+Authentification client et marchand.
 
-6️⃣ Messagerie (/app/dashboard/messages/page.tsx)
+Gestion des rôles (client / merchant).
 
-Liste des threads (autres utilisateurs avec qui on a des messages).
+Abonnements en temps réel pour produits et panier.
 
-Cliquer → ouvrir MessageThread dynamiquement (SPA).
+Requêtes sécurisées selon le rôle.
 
-Envoyer messages temps réel via Supabase Realtime.
+Gestion des erreurs avec toast (messages d’erreur en français).
 
-7️⃣ Paramètres / Profil (/app/dashboard/settings/page.tsx)
+UI / UX
 
-Affiche AvatarUploader.
+Loader / spinner pour toutes les opérations asynchrones.
 
-Modifier info profil, mot de passe, thème (dark/light).
+Formulaires ajout/modification produit fonctionnels et traduits.
 
-Sauvegarde côté Supabase en temps réel.
+Badge compteur pour filtres actifs et nombre de produits.
 
-8️⃣ Composants manquants / à finaliser
+Interface cohérente avec la démo ACME, mais en français et prix en FCFA.
 
-ProductCard.tsx → bouton panier + favoris + pour merchant : edit/delete.
+Corrections et optimisations
 
-OrderList.tsx → liste commandes, actions selon rôle.
+Debounce pour recherche live.
 
-MessageThread.tsx → fil messages + input temps réel.
+Eviter toutes les erreurs déjà rencontrées :
 
-AvatarUploader.tsx → upload vers Supabase Storage.
+module not found
 
-ThemeProvider.tsx → correction localStorage côté serveur.
+syntax errors
 
-VoiceAssistant.tsx → bouton micro et placeholder fonction.
+Requêtes Supabase incorrectes.
 
-9️⃣ Hooks / lib
+Code propre, commenté et maintenable.
 
-useAuth.ts → login/register + rôle + redirection SPA.
+Instructions à Bolt.new :
 
-supabaseClient.ts → connecter Supabase (URL + KEY).
+Prends le code existant tel quel, ne recommence pas à zéro.
 
-api.ts → fonctions utilitaires (cart, favorites, orders).
+Analyse toutes les pages existantes et complète ce qui manque pour que tout soit fonctionnel.
 
-🔟 Tests et comptes
+Traduire les textes non traduits en français.
 
-Créer comptes test :
+Convertir les prix en FCFA partout.
 
-Client : client@test.com / testclient123
+Synchroniser la recherche et les filtres du header/sidebar avec ProductsPage.
 
-Merchant : merchant@test.com / testmerchant123
+Assurer que toutes les requêtes Supabase et abonnements temps réel fonctionnent correctement.
 
-Boutons login test sur login/register.
-
-1️⃣1️⃣ Styles / UX
-
-TailwindCSS, dark/light mode, responsive.
-
-Notifications toast pour succès / erreurs.
-
-SPA partout : aucun reload complet après actions.
-
-⚡ Instructions finales
-
-Chaque page et composant doit être fonctionnel, complet et testable immédiatement.
-
-Respecter structure de fichier déjà définie.
-
-Utiliser React Hooks et Supabase en temps réel.
-
-Gestion des rôles et permissions.
-
-Corriger toutes erreurs localStorage, Realtime, import dynamique.
-
-Sortie attendue :
-Un projet Next.js + Supabase prêt à déployer, toutes pages et fonctionnalités complètes.
+Respecter la logique et la structure du code déjà écrit.
