@@ -1,8 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
-import { Heart, ShoppingCart, MoveVertical as MoreVertical, CreditCard as Edit, Trash2, ChevronLeft, ChevronRight, MessageCircle } from "lucide-react";
+import {
+  Heart,
+  ShoppingCart,
+  MoveVertical as MoreVertical,
+  CreditCard as Edit,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  MessageCircle,
+} from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,28 +48,37 @@ export default function ProductCard({
   const isClient = profile?.role === "client";
   const isMerchant = profile?.role === "merchant";
 
-  // Get all available images
+  // --- Images ---
   const getProductImages = () => {
     const images: string[] = [];
-    
-    // Add images from images array if available
+
+    // From images array
     if (product.images && Array.isArray(product.images)) {
-      images.push(...product.images.filter(img => img && img.trim() !== ''));
+      images.push(
+        ...product.images.filter(
+          (img) => img && typeof img === "string" && img.trim() !== ""
+        )
+      );
     }
-    
-    // Add image_url as fallback if no images array or as additional image
-    if (product.image_url && product.image_url.trim() !== '') {
+
+    // Fallback: image_url
+    if (
+      product.image_url &&
+      typeof product.image_url === "string" &&
+      product.image_url.trim() !== ""
+    ) {
       if (!images.includes(product.image_url)) {
         images.push(product.image_url);
       }
     }
-    
+
     return images;
   };
 
   const productImages = getProductImages();
   const hasMultipleImages = productImages.length > 1;
 
+  // --- Load favorite & merchant profile ---
   useEffect(() => {
     if (user && isClient) {
       checkIfFavorite();
@@ -73,16 +91,13 @@ export default function ProductCard({
   const loadMerchantProfile = async () => {
     try {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('whatsapp_number, phone, display_name, email')
-        .eq('id', product.user_id)
+        .from("profiles")
+        .select("whatsapp_number, phone, display_name, email")
+        .eq("id", product.user_id)
         .single();
-      
-      if (!error && data) {
-        setMerchantProfile(data);
-      }
+      if (!error && data) setMerchantProfile(data);
     } catch (error) {
-      console.error('Error loading merchant profile:', error);
+      console.error("Error loading merchant profile:", error);
     }
   };
 
@@ -103,7 +118,6 @@ export default function ProductCard({
 
   const toggleFavorite = async () => {
     if (!user || !isClient) return;
-
     setIsLoading(true);
     try {
       if (isFavorite) {
@@ -130,7 +144,6 @@ export default function ProductCard({
 
   const addToCart = async () => {
     if (!user || !isClient) return;
-
     setIsLoading(true);
     try {
       const { data: existingItem } = await supabase
@@ -162,34 +175,34 @@ export default function ProductCard({
   };
 
   const sendWhatsAppMessage = () => {
-    if (!merchantProfile) {
-      toast.error("Merchant contact information not available");
-      return;
-    }
-
-    const phoneNumber = merchantProfile.whatsapp_number || merchantProfile.phone;
-    if (!phoneNumber) {
-      toast.error("Merchant WhatsApp number not available");
-      return;
-    }
+    if (!merchantProfile)
+      return toast.error("Merchant contact info not available");
+    const phoneNumber =
+      merchantProfile.whatsapp_number || merchantProfile.phone;
+    if (!phoneNumber)
+      return toast.error("Merchant WhatsApp number not available");
 
     const message = `Bonjour! Je suis intéressé(e) par ce produit:
 
 📦 *${product.title}*
 💰 Prix: ${product.price}€
-📝 Description: ${product.description || 'Aucune description'}
+📝 Description: ${product.description || "Aucune description"}
 🏷️ Catégorie: ${product.category}
 
 Pouvez-vous me donner plus d'informations?`;
 
-    const whatsappUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank');
+    window.open(
+      `https://wa.me/${phoneNumber.replace(
+        /[^0-9]/g,
+        ""
+      )}?text=${encodeURIComponent(message)}`,
+      "_blank"
+    );
     toast.success("Opening WhatsApp...");
   };
 
   const handleDelete = async () => {
     if (!isOwner) return;
-
     try {
       await supabase.from("products").delete().eq("id", product.id);
       toast.success("Product deleted successfully");
@@ -199,17 +212,14 @@ Pouvez-vous me donner plus d'informations?`;
     }
   };
 
-  const nextImage = () => {
-    setCurrentImageIndex((prev) => 
+  const nextImage = () =>
+    setCurrentImageIndex((prev) =>
       prev === productImages.length - 1 ? 0 : prev + 1
     );
-  };
-
-  const prevImage = () => {
-    setCurrentImageIndex((prev) => 
+  const prevImage = () =>
+    setCurrentImageIndex((prev) =>
       prev === 0 ? productImages.length - 1 : prev - 1
     );
-  };
 
   return (
     <Card className="group overflow-hidden transition-all hover:shadow-lg">
@@ -222,9 +232,8 @@ Pouvez-vous me donner plus d'informations?`;
               fill
               className="object-cover transition-transform group-hover:scale-105"
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              unoptimized
             />
-            
-            {/* Image navigation for multiple images */}
             {hasMultipleImages && (
               <>
                 <Button
@@ -243,14 +252,12 @@ Pouvez-vous me donner plus d'informations?`;
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
-                
-                {/* Image indicators */}
                 <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex space-x-1">
                   {productImages.map((_, index) => (
                     <div
                       key={index}
                       className={`w-2 h-2 rounded-full transition-colors ${
-                        index === currentImageIndex ? 'bg-white' : 'bg-white/50'
+                        index === currentImageIndex ? "bg-white" : "bg-white/50"
                       }`}
                     />
                   ))}
@@ -264,7 +271,6 @@ Pouvez-vous me donner plus d'informations?`;
           </div>
         )}
 
-        {/* Action buttons overlay */}
         <div className="absolute top-2 right-2 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
           {isClient && (
             <Button
@@ -281,7 +287,6 @@ Pouvez-vous me donner plus d'informations?`;
               />
             </Button>
           )}
-
           {isOwner && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -291,15 +296,10 @@ Pouvez-vous me donner plus d'informations?`;
               </DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem onClick={onEdit}>
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit
+                  <Edit className="mr-2 h-4 w-4" /> Edit
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={handleDelete}
-                  className="text-destructive"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
+                <DropdownMenuItem onClick={handleDelete}>
+                  <Trash2 className="mr-2 h-4 w-4" /> Delete
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -308,47 +308,17 @@ Pouvez-vous me donner plus d'informations?`;
       </div>
 
       <CardContent className="p-4">
-        <h3 className="font-semibold text-lg mb-2 truncate">{product.title}</h3>
-        {product.description && (
-          <p className="text-muted-foreground text-sm mb-3 line-clamp-2">
-            {product.description}
-          </p>
-        )}
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-2xl font-bold text-primary">
-            ${product.price?.toFixed(2) || '0.00'}
-          </span>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-            {product.category}
-          </span>
-        </div>
-        
+        <h3 className="font-semibold truncate">{product.title}</h3>
+        <p className="font-bold text-primary">{product.price.toFixed(2)}€</p>
+
         {isClient && (
-          <div className="flex space-x-2">
-            <Button 
-              onClick={addToCart} 
-              disabled={isLoading} 
-              size="sm"
-              className="flex-1"
-            >
-              <ShoppingCart className="mr-2 h-4 w-4" />
+          <div className="mt-2 flex space-x-2">
+            <Button size="sm" onClick={addToCart} disabled={isLoading}>
               Add to Cart
             </Button>
-            <Button 
-              onClick={sendWhatsAppMessage}
-              variant="outline"
-              size="sm"
-              className="flex-1"
-            >
-              <MessageCircle className="mr-2 h-4 w-4" />
-              WhatsApp
+            <Button size="sm" onClick={sendWhatsAppMessage}>
+              Contact Merchant
             </Button>
-          </div>
-        )}
-        
-        {isMerchant && !isOwner && (
-          <div className="text-center text-sm text-muted-foreground">
-            Product by another merchant
           </div>
         )}
       </CardContent>
